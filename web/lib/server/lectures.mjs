@@ -16,7 +16,20 @@ import { collapseLoops, whisperText } from '../lectureText.mjs';
 // Fallback only: /billing/status sends each tier's real limit (backend/services/entitlements.py).
 export const LIMITS = { free: 30, pro: 150, weapon: 1200 };
 export const MAX_CHUNK_BYTES = 4_300_000; // under Vercel's 4.5 MB request limit
+export const MAX_TURN_BYTES = 2_000_000; // one spoken turn in voice mode (about a minute)
 const FEATURE = 'lecture_minute';
+// Voice mode's spoken turns (POST /api/lectures/transcribe). Each costs one Whisper call, so they are limited two ways:
+//   a rate: VOICE_TURN_RATE turns a minute per student (every try counts, one that fails too), kept in this server
+//     process like the Classroom API's ai_rate_limit, so a loop of calls is stopped with a 429 and a Retry-After;
+//   a monthly cap per plan, counted from the student's own usage_events rows (feature VOICE_FEATURE, one row per
+//     turn that was written down), the same table the API's measured limits use. The Tutor already allows Free
+//     10 messages a month, so 40 turns leaves room for turns that are heard badly and tried again, and costs
+//     cents at most (a turn is under a minute of audio). Pro and Academic Weapon get twice their Tutor messages.
+// The student's own browser listening is the fallback when either stops them (components/VoiceMode.js).
+export const VOICE_TURN_RATE = { max: 20, windowMs: 60_000 };
+export const VOICE_TURN_LIMITS = { free: 40, pro: 600, weapon: 2000 };
+export const VOICE_FEATURE = 'tutor_voice_turn';
+const turnHits = new Map(); // student -> times of their turns this minute (per server process)
 const ID = /^[A-Za-z0-9_-]{8,64}$/;
 const EXTENSIONS = {
   'audio/webm': 'webm', 'video/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/x-m4a': 'm4a', 'audio/m4a': 'm4a',
@@ -62,6 +75,9 @@ function userIdFromToken(authorization) {
   }
 }
 
+// For tests: forget every student's recent turns.
+export function resetVoiceTurns() { turnHits.clear(); }
+
 export function createLectureService({ env = process.env, fetch: fetchImpl = globalThis.fetch, sleep = sleepReal, now = () => new Date() } = {}) {
   const provider = aiProvider(env);
   const openaiKey = provider.key;
@@ -90,7 +106,8 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
     const plan = !data?.plan || data.plan === 'free' ? 'free' : 'pro';
     const tier = LIMITS[data?.tier] !== undefined ? data.tier : (plan === 'free' ? 'free' : 'weapon');
     const limit = Number(data?.features?.[FEATURE]?.limit) || LIMITS[tier];
-    return { userId, plan, limit, unlimited: Boolean(data?.unlimited) };
+    const tutorLeft = Number.isFinite(Number(data?.features?.tutor?.remaining)) ? Number(data.features.tutor.remaining) : null;
+    return { userId, plan, tier, limit, unlimited: Boolean(data?.unlimited), tutorLeft };
   }
 
   async function used(userId) {
@@ -117,6 +134,45 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
         await db('/rest/v1/rpc/record_feature_usage', { method: 'POST', body: JSON.stringify({ p_user_id: who.userId, p_feature: FEATURE, p_month: currentMonth(now()), p_request_key: `${FEATURE}:${recordingId}:${minute}`.slice(0, 120) }) });
       } catch { return; } // usage is best effort until the migration is applied
     }
+  }
+
+  // The student's turn rate: false (and the seconds to wait) once they are over VOICE_TURN_RATE.
+  function takeTurn(userId) {
+    const at = now().getTime();
+    const hits = (turnHits.get(userId) || []).filter(time => at - time < VOICE_TURN_RATE.windowMs);
+    if (hits.length >= VOICE_TURN_RATE.max) {
+      turnHits.set(userId, hits);
+      return { ok: false, wait: Math.max(1, Math.ceil((hits[0] + VOICE_TURN_RATE.windowMs - at) / 1000)) };
+    }
+    hits.push(at);
+    turnHits.set(userId, hits);
+    if (turnHits.size > 5000) for (const [id, times] of turnHits) if (!times.some(time => at - time < VOICE_TURN_RATE.windowMs)) turnHits.delete(id);
+    return { ok: true, wait: 0 };
+  }
+
+  // Spoken turns written down this month (usage_events rows). 0 when they can't be counted: a problem reading
+  // never blocks a student. Works with or without the (user_id, feature, created_at) index.
+  async function turnsUsed(userId) {
+    try {
+      const month = currentMonth(now());
+      const response = await db(`/rest/v1/usage_events?select=id&user_id=eq.${encodeURIComponent(userId)}&feature=eq.${VOICE_FEATURE}&created_at=gte.${month}-01T00:00:00Z`, {
+        headers: { Prefer: 'count=exact', 'Range-Unit': 'items', Range: '0-0' },
+      });
+      if (!response.ok) return 0;
+      return Number(/\/(\d+)$/.exec(response.headers.get('content-range') || '')?.[1] || 0);
+    } catch {
+      return 0;
+    }
+  }
+
+  async function chargeTurn(who) {
+    if (!metered) return;
+    try {
+      await db('/rest/v1/usage_events', {
+        method: 'POST', headers: { Prefer: 'return=minimal' },
+        body: JSON.stringify({ user_id: who.userId, feature: VOICE_FEATURE, model: transcribeModel, prompt_tokens: 1, completion_tokens: 0, cached_tokens: 0 }),
+      });
+    } catch { /* best effort, like lecture minutes */ }
   }
 
   // AI call (Groq or OpenAI) with a time limit and one retry for timeouts, rate limits and server errors.
@@ -180,6 +236,40 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
     return { status: 200, body: { seq, start_ms: startMs, text: whisperText(data) } };
   }
 
+  // Voice mode (components/VoiceMode.js): one spoken turn to the Tutor, written down by the same Whisper call
+  // as a lecture part. It is not lecture minutes and the audio is never stored; the student needs Tutor
+  // messages left this month, since the words go straight to the Tutor. Limited by VOICE_TURN_RATE (429, with
+  // Retry-After) and the monthly VOICE_TURN_LIMITS (402, feature voice_turns); voice mode then falls back to the
+  // browser's own speech recognition, or says so in one line.
+  async function transcribe(authorization, { audio, contentType }) {
+    if (!openaiKey) return { status: 503, body: { detail: "Transcription isn't set up yet.", code: 'not_configured' } };
+    const who = await account(authorization);
+    if (!who) return { status: 401, body: { detail: 'Sign in again.' } };
+    const turn = takeTurn(who.userId);
+    if (!turn.ok) {
+      return { status: 429, headers: { 'Retry-After': String(turn.wait) }, body: { detail: { code: 'rate_limited', message: 'That was a lot of voice turns in a minute. Wait a moment and try again.' } } };
+    }
+    if (!audio?.length) return { status: 200, body: { text: '' } };
+    if (audio.length > MAX_TURN_BYTES) return { status: 413, body: { detail: 'That was too long to send at once.' } };
+    const ext = extensionFor(contentType);
+    if (!ext) return { status: 415, body: { detail: 'Use an mp3, m4a, wav or webm recording.' } };
+    if (!who.unlimited && who.tutorLeft !== null && who.tutorLeft <= 0) {
+      return { status: 402, body: { detail: { code: 'limit_reached', feature: 'tutor', message: "You've used this month's Tutor messages." } } };
+    }
+    const cap = Number(who.voiceTurnLimit) || VOICE_TURN_LIMITS[who.tier] || VOICE_TURN_LIMITS.free;
+    if (metered && !who.unlimited && (await turnsUsed(who.userId)) >= cap) {
+      return { status: 402, body: { detail: { code: 'limit_reached', feature: 'voice_turns', plan: who.plan === 'pro' ? 'classroom_plus' : 'free', limit: cap, message: "You've used this month's voice listening." } } };
+    }
+    const form = new FormData();
+    form.append('file', new Blob([audio], { type: String(contentType).split(';')[0] }), `turn.${ext}`);
+    form.append('model', transcribeModel);
+    form.append('response_format', /^whisper/i.test(transcribeModel) ? 'verbose_json' : 'json');
+    const data = await openai('/audio/transcriptions', { method: 'POST', body: form }, { timeoutMs: 15000 });
+    if (!data) return { status: 502, body: { detail: "Couldn't hear that clearly. Try again." } };
+    await chargeTurn(who);
+    return { status: 200, body: { text: whisperText(data) } };
+  }
+
   async function notes(authorization, { segments = [], classes = [] } = {}) {
     const who = await account(authorization);
     if (!who) return { status: 401, body: { detail: 'Sign in again.' } };
@@ -211,5 +301,5 @@ export function createLectureService({ env = process.env, fetch: fetchImpl = glo
     return { status: 200, body: { title: raw.slice(0, 120) } };
   }
 
-  return { usage, chunk, notes, title };
+  return { usage, chunk, transcribe, notes, title };
 }

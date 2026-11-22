@@ -9,6 +9,7 @@ The published extension reads only `plan` ("classroom_plus" = paid, "free"), so 
 keeps its old meaning for every paid tier; `tier` says which paid tier it is.
 """
 
+import logging
 import os
 from datetime import datetime, timezone
 from typing import Optional
@@ -16,6 +17,8 @@ from typing import Optional
 from fastapi import HTTPException
 
 from database import get_supabase
+
+logger = logging.getLogger(__name__)
 
 PRO = "classroom_plus"  # the `plan` value every paid tier reports (extension compatibility)
 TIERS = ("free", "pro", "weapon")
@@ -48,6 +51,9 @@ LIMITS = {
         "lecture_minute": 30,
         # Napkin visuals, made and stored by the web app's /api/visual route.
         "visual": 10,
+        # Tutor voice mode's cloud voice (POST /tutor/speak), counted in characters spoken. Free hears the
+        # browser's own voice, which costs nothing.
+        "voice_characters": 0,
     },
     # The study loop: cheap features stay generous, expensive ones are capped.
     "pro": {
@@ -61,6 +67,7 @@ LIMITS = {
         "light": 500,
         "lecture_minute": 150,
         "visual": 10,
+        "voice_characters": 150_000,
     },
     # Automation and the expensive features.
     "weapon": {
@@ -74,6 +81,7 @@ LIMITS = {
         "light": 500,
         "lecture_minute": 1200,
         "visual": 200,
+        "voice_characters": 150_000,
     },
 }
 FEATURES = tuple(LIMITS["free"])
@@ -89,6 +97,7 @@ FEATURE_LABELS = {
     "light": "AI reading actions",
     "lecture_minute": "recording minutes",
     "visual": "visuals",
+    "voice_characters": "Tutor voice characters",
 }
 FEATURE_SINGULAR = {
     "guide": "study guide",
@@ -101,10 +110,20 @@ FEATURE_SINGULAR = {
     "light": "AI reading action",
     "lecture_minute": "recording minute",
     "visual": "visual",
+    "voice_characters": "Tutor voice character",
 }
 
 
+# Features counted in an amount (characters spoken), not in uses: each use is one usage_events row whose
+# prompt_tokens column holds the amount, under its own feature name. usage_ledger counts one row per use,
+# so these never go there. feature -> usage_events feature.
+MEASURED = {"voice_characters": "tutor_voice"}
+MEASURED_PAGE = 1000  # PostgREST returns at most this many rows per request
+
+
 def limit_message(feature: str, limit: int) -> str:
+    if limit == 0:
+        return f"{FEATURE_LABELS[feature][:1].upper()}{FEATURE_LABELS[feature][1:]} come with a paid plan."
     if limit == 1:
         return f"You've used your free {FEATURE_SINGULAR.get(feature, FEATURE_LABELS[feature])}."
     return f"You've used all {limit} {FEATURE_LABELS[feature]} this month."
@@ -165,15 +184,50 @@ def plan_for(row: Optional[dict]) -> str:
     return "free" if tier_for(row) == "free" else "pro"
 
 
-def usage_counts(user_id: str, month: Optional[str] = None) -> dict:
+def measured_usage(user_id: str, feature: str, month: Optional[str] = None) -> int:
+    """The amount of a measured feature (MEASURED) used this month: the sum of its usage_events rows.
+    0 when usage_events can't be read, so a reading problem never blocks the student."""
+    month = month or current_month()
+    year, number = (int(part) for part in month.split("-"))
+    start = datetime(year, number, 1, tzinfo=timezone.utc)
+    end = datetime(year + 1, 1, 1, tzinfo=timezone.utc) if number == 12 else datetime(year, number + 1, 1, tzinfo=timezone.utc)
+    total, offset = 0, 0
+    try:
+        while True:
+            rows = (get_supabase().table("usage_events").select("prompt_tokens")
+                    .eq("user_id", user_id).eq("feature", MEASURED[feature])
+                    .gte("created_at", start.isoformat()).lt("created_at", end.isoformat())
+                    .order("id").range(offset, offset + MEASURED_PAGE - 1).execute().data or [])
+            total += sum(int(row.get("prompt_tokens") or 0) for row in rows)
+            if len(rows) < MEASURED_PAGE:
+                return total
+            offset += MEASURED_PAGE
+    except Exception as error:
+        # Shows in `fly logs`. Only the feature and the kind of error: never the student's id or anything they said.
+        logger.warning("usage_events could not be read for %s (%s); counting the %s used so far", MEASURED[feature], type(error).__name__, total)
+        return total
+
+
+def usage_counts(user_id: str, month: Optional[str] = None, measured: bool = True) -> dict:
+    """Uses per feature this month (usage_ledger), and the amount used of each measured feature
+    (usage_events) unless measured is False."""
     result = get_supabase().rpc(
         "feature_usage_counts", {"p_user_id": user_id, "p_month": month or current_month()}
     ).execute()
     counts = {feature: 0 for feature in FEATURES}
     for item in result.data or []:
-        if item.get("feature") in counts:
+        if item.get("feature") in counts and item["feature"] not in MEASURED:
             counts[item["feature"]] = int(item.get("used") or 0)
+    if measured:
+        for feature in MEASURED:
+            counts[feature] = measured_usage(user_id, feature, month)
     return counts
+
+
+def _used(user_id: str, feature: str) -> int:
+    if feature in MEASURED:
+        return measured_usage(user_id, feature)
+    return usage_counts(user_id, measured=False)[feature]
 
 
 def entitlement(user_id: str) -> dict:
@@ -243,26 +297,34 @@ def remaining(user_id: str, feature: str) -> int:
     if user_id in _unlimited_ids():
         return 10**6
     tier = tier_for(subscription_row(user_id))
-    return max(0, LIMITS[tier][feature] - usage_counts(user_id)[feature])
+    return max(0, LIMITS[tier][feature] - _used(user_id, feature))
 
 
-def require(user_id: str, feature: str) -> None:
-    """Raise a 402 before any AI spend if the user has nothing left for this feature."""
+def require(user_id: str, feature: str, amount: int = 1) -> None:
+    """Raise a 402 before any AI spend if the user has nothing left for this feature. A measured feature
+    (MEASURED) needs room for the whole amount about to be used."""
     if feature not in FEATURES:
         raise ValueError(f"Unknown feature: {feature}")
     if user_id in _unlimited_ids():
         return
     tier = tier_for(subscription_row(user_id))
-    used = usage_counts(user_id)[feature]
+    used = _used(user_id, feature)
     limit = LIMITS[tier][feature]
-    if used >= limit:
+    if used + (max(1, int(amount)) if feature in MEASURED else 1) > limit:
         raise LimitReached(feature, used, limit, tier)
 
 
-def record(user_id: str, feature: str, request_key: Optional[str] = None) -> None:
-    """Charge one use after success. A repeated request_key is never charged twice."""
+def record(user_id: str, feature: str, request_key: Optional[str] = None, amount: int = 1, model: str = "") -> None:
+    """Charge one use after success. A repeated request_key is never charged twice. A measured feature
+    is charged its amount as one usage_events row (prompt_tokens = amount, model = who served it)."""
     if feature not in FEATURES:
         raise ValueError(f"Unknown feature: {feature}")
+    if feature in MEASURED:
+        get_supabase().table("usage_events").insert({
+            "user_id": user_id, "feature": MEASURED[feature], "model": model or "unknown",
+            "prompt_tokens": max(0, int(amount)), "completion_tokens": 0, "cached_tokens": 0,
+        }).execute()
+        return
     get_supabase().rpc(
         "record_feature_usage",
         {

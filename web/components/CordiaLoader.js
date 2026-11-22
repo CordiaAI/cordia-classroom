@@ -4,9 +4,10 @@ const SHOW_AFTER = 200; // never flash a loader for fast loads
 const MIN_VISIBLE = 400; // once shown, keep it long enough to read as intentional
 
 // The Cordia mark, breathing (opacity 0.4 → 1, 1.2 s). The only loading indicator in the app.
-export default function CordiaLoader({ size = 48, label = 'Loading', className = '' }) {
+// silent: no announcement of its own, for a mark beside text that says what is happening (the Tutor's thinking line).
+export default function CordiaLoader({ size = 48, label = 'Loading', className = '', silent = false }) {
   return (
-    <span className={`c-loader ${className}`} role="status" aria-label={label} style={{ '--loader-size': `${size}px` }}>
+    <span className={`c-loader ${className}`} {...(silent ? { 'aria-hidden': 'true' } : { role: 'status', 'aria-label': label })} style={{ '--loader-size': `${size}px` }}>
       <img className="c-loader-mark" src="/academic-butterfly-open-book.png" alt="" />
       <style jsx global>{`
         .c-loader { display: inline-grid; place-items: center; width: var(--loader-size); height: var(--loader-size); flex: 0 0 auto; }

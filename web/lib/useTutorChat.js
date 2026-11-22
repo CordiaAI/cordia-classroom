@@ -8,9 +8,12 @@ import { tutorMode } from './tutorPrefs';
 import { unsupportedFileMessage, useFileDropZone } from './fileDrop';
 import { loadSavedChats, reportTutorSession, tutorChatsChanged } from './tutorChats';
 import useDictation from './useDictation';
+import { classLabel } from './classLabel';
+import { pollSteps, requestStatusLines } from './tutorStatus.mjs';
 
 // The Tutor client: one conversation with the server's Tutor session (GET /tutor/session,
-// POST /chat), its material, attachments, modes, saved chats, voice and limits. The side panel and
+// POST /chat), its material, attachments, modes, saved chats, voice (dictation, read aloud and voice
+// mode's spoken turns, sendVoice) and limits. The side panel and
 // the full Tutor page (components/AIChatWidget.js) and the chat home's composer (pages/home.js)
 // all talk to the Tutor through this one hook.
 
@@ -48,16 +51,6 @@ function combineAttachments(files) {
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 const localDay = (date = new Date()) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const MAX_MESSAGES = 30;
-const SKILL_PROGRESS = {
-  explain: 'Explaining material…',
-  capture: 'Reading current page…',
-  build_guide: 'Building guide…',
-  practice: 'Creating practice problems…',
-  retain: 'Strengthening recall…',
-  plan: 'Planning study time…',
-  find_material: 'Finding related material…',
-  organize: 'Organizing study material…',
-};
 
 // freshOnMount: the full Tutor page opens on a new chat; the side panel starts one each time it opens.
 // resumeChatId: the full Tutor page opens that saved chat instead (the sidebar's Recent chats).
@@ -94,6 +87,12 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   const [retainContext, setRetainContext] = useState(null);
   const [savedDraft, setSavedDraft] = useState('');
   const [loading, setLoading] = useState(false);
+  // What the Tutor shows while it works (lib/tutorStatus.mjs): the real steps the server is on and the
+  // lines about the question. Both start empty with each question and stop when the answer is in.
+  const [thinking, setThinking] = useState({ steps: [], lines: [] });
+  const stopStatus = useRef([]);
+  const endStatus = () => { stopStatus.current.forEach(stop => stop()); stopStatus.current = []; setThinking({ steps: [], lines: [] }); };
+  useEffect(() => () => stopStatus.current.forEach(stop => stop()), []);
   // While a question is in flight the server copy of the session lags behind this one,
   // so background refreshes must not replace it (that erased the student's new message).
   const sendingRef = useRef(false);
@@ -344,7 +343,6 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   const counted = typeof startWith === 'function' ? startMessages || [] : messages;
   const remaining = MAX_MESSAGES - counted.filter(message => message.role === 'user').length;
   const busy = loading || freshPending || (session?.status && session.status !== 'idle');
-  const progressLabel = SKILL_PROGRESS[session?.active_skill] || 'Cordia is working…';
 
   // "Explain" and "Ask why" send at once so the Tutor explains without another tap.
   useEffect(() => {
@@ -397,16 +395,37 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     setAttachments(current => current.filter(file => file.id !== id));
   }
 
-  async function sendMessage() {
-    const question = input.trim();
-    if (!question || !canSubmit || busy || remaining <= 0 || !session?.id) return;
+  // The message in the box.
+  function sendMessage() {
+    return send(input.trim());
+  }
+
+  // Voice mode (components/VoiceMode.js): one spoken turn, sent exactly as a typed message is (the same chat,
+  // material, skill, class and limits), with voice: true so the reply is written to be heard. The box keeps
+  // whatever was typed in it. Resolves to { ok: true, answer } or { ok: false, status, message }.
+  function sendVoice(text) {
+    return send(String(text || '').trim(), { voice: true });
+  }
+
+  async function send(question, { voice = false } = {}) {
+    if (!question || !canSubmit || busy || remaining <= 0 || !session?.id) {
+      return { ok: false, status: 0, message: remaining <= 0 ? 'This chat is full. Start a new chat from the sidebar.' : '' };
+    }
     stopDictation();
     walkthroughEvent('ask');
     setChatsOpen(false);
-    setInput('');
+    if (!voice) setInput('');
     setLocalError('');
     sendingRef.current = true;
     setLoading(true);
+    // The lines about the question are asked for now, beside everything else: nothing waits for them.
+    endStatus();
+    const classId = needsTargetClass ? targetClassId : scopeClassId || material?.folder_id;
+    stopStatus.current.push(requestStatusLines({
+      call: apiFetch, question, title: material?.title,
+      className: classLabel(classes.find(item => item.id === classId)?.name || '').title,
+      onLines: lines => setThinking(now => ({ ...now, lines })),
+    }));
     setSentHere(true);
     startedRef.current = true;
     // startWith (the chat page): this message starts a new chat, or carries on a saved one, first.
@@ -425,14 +444,15 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
         // page stays what it was, the question back in the box), then the session is read again.
         sendingRef.current = false;
         startedRef.current = false;
+        endStatus();
         setSentHere(false);
         setSession(session);
-        setInput(question);
+        if (!voice) setInput(question);
         if (started?.message) setLocalError(started.message);
         setLoading(false);
         const refreshed = await apiFetch('/tutor/session');
         if (refreshed?.id) setSession(refreshed);
-        return;
+        return { ok: false, status: 0, message: started?.message || '' };
       }
       current = started.session;
       setSession({ ...current, status: 'running', messages: [...(current.messages || []), asked] });
@@ -442,6 +462,8 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
       : material?.kind === 'note'
         ? (material.content || '')
         : (material?.content || '');
+    // The server notes each real step as it starts; they are read while /chat is open.
+    stopStatus.current.push(pollSteps({ call: apiFetch, sessionId: current.id, onSteps: steps => setThinking(now => ({ ...now, steps })) }));
     const data = await apiFetch('/chat', {
       method: 'POST',
       timeoutMs: 120000,
@@ -460,12 +482,14 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
         class_id: needsTargetClass ? targetClassId : scopeClassId || material?.folder_id || undefined,
         assignment_key: working?.key || undefined,
         mode: 'short',
-        rich_text: true,
+        rich_text: !voice,
         // The student's own day, so "tomorrow" and "Friday" in a study plan mean their days.
         local_date: localDay(),
+        ...(voice ? { voice: true } : {}),
       }),
     });
     sendingRef.current = false;
+    endStatus();
     if (data?.action === 'created_guide' && !providedGuides) {
       const refreshed = await apiFetch('/guides?fields=summary&limit=200');
       if (Array.isArray(refreshed?.guides)) {
@@ -494,16 +518,18 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
       // The Tutor didn't answer. The session goes back to before the question and the question to the
       // box in the same step as the page's own reply (onSendFailed: the home first message goes back
       // to the home), so no frame shows a half-way layout; the session is read again after.
+      const message = data?.answer || apiErrorMessage(data?.detail, 'Cordia could not answer that yet.');
       setSession(current);
-      setInput(question);
-      setLocalError(data?.answer || apiErrorMessage(data?.detail, 'Cordia could not answer that yet.'));
+      if (!voice) setInput(question);
+      setLocalError(message);
       setLoading(false);
       onSendFailed?.({ status: data?.httpStatus || 0, detail: data?.detail, failed: data?.failed, question });
       const refreshed = await apiFetch('/tutor/session');
       if (refreshed?.id) setSession(refreshed);
-      return;
+      return { ok: false, status: data?.httpStatus || 0, message };
     }
     setLoading(false);
+    return { ok: true, answer: data.answer || '', action: data.action || '' };
   }
 
   // Chats: the live conversation is saved when a new one starts, and saved chats can be reopened.
@@ -625,11 +651,11 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     router, rootRef, endRef, fileRef,
     working, setWorking, guides, notes, classes, materials, material, general,
     contextKey, setContextKey, attachments, setAttachments, combinedAttachments, removeAttachment, attachFiles, extracting, attachDropActive,
-    browserMaterial, session, messages, input, setInput, sendMessage, sentHere,
+    browserMaterial, session, messages, input, setInput, sendMessage, sendVoice, sentHere,
     savedMode, skillOverride, setSkillOverride, selectedSkillId, needsTargetClass, targetClassId, setTargetClassId,
-    hasRequiredContext, canSubmit, remaining, busy, loading, progressLabel, localError, setLocalError,
+    hasRequiredContext, canSubmit, remaining, busy, loading, thinking, localError, setLocalError,
     chatsOpen, setChatsOpen, savedChats, chatsError, deletingChat, setDeletingChat, deleteSavedChat, startChat,
     deleteFromTutor, openSource,
-    Recognition, canSpeak, listening, interim, dictationError, toggleMic, speakingIndex, toggleSpeech,
+    Recognition, canSpeak, listening, interim, dictationError, toggleMic, stopDictation, speakingIndex, toggleSpeech,
   };
 }

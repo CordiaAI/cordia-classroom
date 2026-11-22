@@ -236,12 +236,13 @@ async function _doRefresh() {
 }
 
 // For binary responses (e.g. rendered PDFs) and uploads: same 401 refresh as apiFetch,
-// returns the raw Response, and applies no short timeout.
-export async function authorizedFetch(path, options = {}) {
+// returns the raw Response, and applies no short timeout. quietLimit: a 402 goes back to the caller
+// without opening the upgrade dialog (voice mode falls back to the browser's voice instead).
+export async function authorizedFetch(path, { quietLimit = false, ...options } = {}) {
   const request = () => fetch(API + path, { ...options, headers: { ...authOnlyHeaders(), ...options.headers } });
   let response = await request();
   if (response.status === 401 && await tryRefreshToken()) response = await request();
-  if (response.status === 402) {
+  if (response.status === 402 && !quietLimit) {
     response.clone().json().then(data => announceLimit(response, data)).catch(() => { /* no readable limit details: the caller still gets the 402 */ });
   }
   return response;
@@ -252,7 +253,8 @@ export async function authorizedFetch(path, options = {}) {
 // quietLimit: a plan limit (402) returns its error to the caller without opening the upgrade dialog
 // (Learn's format ladder falls back quietly instead of interrupting a round).
 // withStatus: the answer also carries its HTTP status (saved chats tell 404 from 409, lib/chats.js).
-export async function apiFetch(path, { reportFailure = false, quietLimit = false, withStatus = false, ...options } = {}) {
+// quiet: a failure is not logged to the console (background polls that simply try again, lib/tutorStatus.mjs).
+export async function apiFetch(path, { reportFailure = false, quietLimit = false, withStatus = false, quiet = false, ...options } = {}) {
   if (typeof window === 'undefined' || !getToken()) return null;
   try {
     let resp = await fetchWithTimeout(API + path, {
@@ -281,7 +283,7 @@ export async function apiFetch(path, { reportFailure = false, quietLimit = false
     if (withStatus && data && typeof data === 'object' && !Array.isArray(data)) data.httpStatus = resp.status;
     return data;
   } catch (e) {
-    console.error('API fetch error:', path, e);
+    if (!quiet) console.error('API fetch error:', path, e);
     if (!reportFailure) return null;
     return e?.name === 'AbortError'
       ? { failed: 'timeout', detail: 'Classroom took too long to answer.' }

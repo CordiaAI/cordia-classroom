@@ -104,6 +104,7 @@ FEATURES = {
     "retain_why": CallSpec(LIGHT, 250),
     "retain_remember": CallSpec(LIGHT, 200),
     "tutor_memory": CallSpec(LIGHT, 300),  # durable study facts a student shared in a Tutor chat
+    "tutor_status": CallSpec(LIGHT, 80),  # 3 or 4 lines shown while the Tutor works (never counted toward limits)
     "practice_classify": CallSpec(LIGHT, 100),
     "quiz_distractors": CallSpec(LIGHT, 4096),
     "quiz_distractors_fix": CallSpec(LIGHT, 2048),

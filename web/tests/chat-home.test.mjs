@@ -79,7 +79,8 @@ test('the composer reuses the Tutor client and the New sheet; plan limits keep w
   assert.match(hook, /apiFetch\('\/chat'/);
   assert.match(hook, /class_id: needsTargetClass \? targetClassId : scopeClassId \|\| material\?\.folder_id \|\| undefined/);
   // A 402 restores the question to the box; its detail is a message object, never rendered raw.
-  assert.match(hook, /setInput\(question\);\n      setLocalError\(data\?\.answer \|\| apiErrorMessage\(data\?\.detail/);
+  // (A spoken turn in voice mode, F11, never writes over what is in the box.)
+  assert.match(hook, /const message = data\?\.answer \|\| apiErrorMessage\(data\?\.detail[^\n]*\n      setSession\(current\);\n      if \(!voice\) setInput\(question\);\n      setLocalError\(message\);/);
   assert.match(read('components/AIChatWidget.js'), /useTutorChat\(props\)/);
   assert.match(read('components/NewSheet.js'), /setAutoCreate\(Boolean\(event\.detail\?\.create\)\)/);
 });

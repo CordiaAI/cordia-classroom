@@ -480,7 +480,7 @@ test('the chat page answers a failed send from the same words, keeps the typed t
   assert.match(home, /const STALE = \['gone', 'moved', 'busy', 'missing'\]/);
   const hook = read('lib/useTutorChat.js');
   assert.match(hook, /onSendFailed\?\.\(\{ status: data\?\.httpStatus \|\| 0, detail: data\?\.detail/);
-  assert.match(hook, /setInput\(question\);\n      setLocalError\(data\?\.answer/, 'the question goes back in the box');
+  assert.match(hook, /if \(!voice\) setInput\(question\);\n      setLocalError\(message\);/, 'the question goes back in the box (a typed one; a spoken turn leaves the box alone)');
   assert.match(home, /goTo\(''\)/, 'a first message that fails (a plan limit) goes back to the home');
   assert.match(home, /moving\.current\?\.cancel\(\)/, 'the move back starts from where the composer is');
 });

@@ -97,17 +97,18 @@ assert.match(tutor, /appliedPreferred\.current = ''; \}, \[router\.asPath, prefe
 // Send shows only when there is text.
 assert.match(tutor, /\{input\.trim\(\) && \(\n\s*<button type="button" className="cordia-tutor-send"/);
 // Web Tutor: readable answers, the student's message stays visible, and a live loader bubble.
-assert.match(tutor, /rich_text: true/);
+// (Voice mode's spoken turns, F11, ask for a reply written to be heard instead: rich_text is off for them.)
+assert.match(tutor, /rich_text: !voice/);
 assert.match(tutor, /parseTutorAnswer\(text\)/);
 assert.match(tutor, /next\?\.id && !sendingRef\.current/);
 assert.match(tutor, /tutor-thinking/);
-assert.match(tutor, /<CordiaLoader size=\{20\} label="Thinking" \/>/);
+assert.match(tutor, /<TutorThinking /);
+assert.match(read('web', 'components', 'TutorThinking.js'), /<CordiaLoader size=\{20\} silent \/>/);
 assert.match(tutor, /apiFetch\('\/smart_notes'\)/);
 assert.match(tutor, /guide_id: material\.id/);
 assert.match(tutor, /note_id: material\.id/);
 assert.match(tutor, /context_title: material\.title/);
 assert.match(tutor, /\/extract-file-text/);
-assert.match(tutor, /find_material: 'Finding related material…'/);
 assert.match(tutor, /Browser unavailable\. Open the Chrome side panel/);
 assert.match(tutor, /choose an existing guide or note, or attach a file/);
 assert.match(tutor, /Based on \{message\.source\.title\}/);
