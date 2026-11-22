@@ -66,12 +66,22 @@ function fakeMicrophone() {
   };
 }
 
-async function session(browser, { width, height, theme, reduced, plan = 'pro', speak = 'ok', chatDelay = 5000, microphone = 'on' }) {
+async function session(browser, { width, height, theme, reduced, plan = 'pro', speak = 'ok', chatDelay = 5000, microphone = 'on', transcribe = 'ok', recognizer = false }) {
   const context = await browser.newContext({ viewport: { width, height }, reducedMotion: reduced ? 'reduce' : 'no-preference', colorScheme: theme });
   // A blocked microphone: getUserMedia says NotAllowedError, as Chrome, Safari and Firefox do.
   await context.addInitScript(microphone === 'blocked'
     ? () => { navigator.mediaDevices.getUserMedia = () => Promise.reject(new DOMException('Permission denied', 'NotAllowedError')); }
     : fakeMicrophone);
+  // A stand-in for the browser's speech recognition: it "hears" one sentence a moment after it starts.
+  if (recognizer) {
+    await context.addInitScript(() => {
+      window.SpeechRecognition = class {
+        start() { setTimeout(() => this.onresult?.({ resultIndex: 0, results: [Object.assign([{ transcript: 'Browser heard this' }], { isFinal: true })] }), 1200); }
+        stop() { setTimeout(() => this.onend?.(), 30); }
+        abort() {}
+      };
+    });
+  }
   const state = createState(true);
   state.statusLines = LINES;
   state.statusDelay = 300;
@@ -92,6 +102,8 @@ async function session(browser, { width, height, theme, reduced, plan = 'pro', s
   });
   await context.route(/\/api\/lectures\/transcribe/, route => {
     state.transcribed = (state.transcribed || 0) + 1;
+    if (transcribe === 'rate') return route.fulfill({ status: 429, headers: { 'retry-after': '30' }, json: { detail: { code: 'rate_limited', message: 'Wait.' } } });
+    if (transcribe === 'cap') return route.fulfill({ status: 402, json: { detail: { code: 'limit_reached', feature: 'voice_turns', limit: 40 } } });
     return route.fulfill({ json: { text: 'Why does water follow salt?' } });
   });
   const page = await context.newPage();
@@ -189,6 +201,7 @@ const SIZES = [
         expect(LINES.some(item => thinking.includes(item)) || thinking.includes('Reading your question'), `thinking line: ${thinking}`);
         expect(await page.$eval('.voice-heard', node => node.textContent) === 'Why does water follow salt?', 'the student caption');
         expect(await page.$$eval('.voice-view .c-loader', items => items.length) === 0, 'one mark only: the T4b line brings no second mark');
+        expect(await page.$eval('.voice-view p.sr-only[aria-live="polite"]', node => node.textContent) === 'You said: Why does water follow salt?', 'what was heard is announced once when Thinking starts');
         await shot(page, `voice-thinking-${tag}`);
         await page.waitForFunction(() => document.querySelector('.voice-state')?.textContent === 'Speaking', null, { timeout: 12000 });
         await page.waitForTimeout(400);
@@ -242,6 +255,86 @@ const SIZES = [
         await context.close();
       });
 
+      await check(`${tag}: End during Thinking puts focus back on the voice button, which is aria-disabled and never disabled`, async () => {
+        const { page, context, problems } = await session(browser, { ...size, theme });
+        await openVoice(page);
+        await page.waitForFunction(() => document.querySelector('.voice-state')?.textContent === 'Thinking', null, { timeout: 10000 });
+        await page.click('.voice-end');
+        await page.waitForSelector('.voice-view', { state: 'detached', timeout: 3000 });
+        await page.waitForTimeout(150);
+        const focused = await page.evaluate(() => {
+          const active = document.activeElement;
+          return { label: active?.getAttribute('aria-label'), disabled: active?.disabled, ariaDisabled: active?.getAttribute('aria-disabled'), inComposer: Boolean(active?.closest('.composer')) };
+        });
+        expect(focused.inComposer && focused.label === 'Start voice mode', `focus: ${JSON.stringify(focused)}`);
+        expect(focused.disabled === false && focused.ariaDisabled === 'true', `the button while the Tutor is busy: ${JSON.stringify(focused)}`);
+        // A press on it while the Tutor is busy does nothing.
+        await page.keyboard.press('Enter');
+        await page.waitForTimeout(300);
+        expect(await page.$('.voice-view') === null, 'an aria-disabled voice button does not start voice mode');
+        expect(!problems.length, problems.join(' | '));
+        await context.close();
+      });
+
+      if (!size.reduced) {
+        await check(`${tag}: End during the fade-in turns the view around from where it is, never to full opacity first`, async () => {
+          const { page, context } = await session(browser, { ...size, theme });
+          await page.goto(BASE + '/home');
+          await page.waitForSelector('button[aria-label="Start voice mode"]', { timeout: 30000 });
+          await page.waitForTimeout(600);
+          const seen = await page.evaluate(async () => {
+            const frame = () => new Promise(resolve => requestAnimationFrame(resolve));
+            document.querySelector('button[aria-label="Start voice mode"]').click();
+            let view = null;
+            while (!view) { await frame(); view = document.querySelector('.voice-view'); }
+            await new Promise(resolve => setTimeout(resolve, 90));
+            const before = Number(getComputedStyle(view).opacity);
+            document.querySelector('.voice-end').click();
+            const after = [];
+            for (let i = 0; i < 8 && document.querySelector('.voice-view'); i += 1) { await frame(); after.push(Number(getComputedStyle(view).opacity)); }
+            return { before, after };
+          });
+          expect(seen.before > 0 && seen.before < 0.95, `mid fade-in: ${JSON.stringify(seen)}`);
+          // Frames can be slow here (the entrance keeps running until the next one is drawn), so the exit may start a little
+          // above where the last frame showed. What it must never do is jump to full opacity first, as a keyframe exit did.
+          const peak = Math.max(...seen.after);
+          expect(peak < 0.95, `the exit jumped up to ${peak}: ${JSON.stringify(seen)}`);
+          const turn = seen.after.indexOf(peak);
+          expect(seen.after.slice(turn).every((value, index, list) => index === 0 || value <= list[index - 1] + 0.001), `the exit is steady once it turns: ${JSON.stringify(seen)}`);
+          expect(seen.after[seen.after.length - 1] <= 0.45, `fading out: ${JSON.stringify(seen)}`);
+          await context.close();
+        });
+      }
+
+      for (const [transcribe, line] of [['cap', "You've used this month's voice listening. Type your message instead."], ['rate', 'That was a lot of voice turns in a minute. Wait a moment and try again, or type instead.']]) {
+        await check(`${tag}: transcribe ${transcribe === 'cap' ? 'at the monthly cap (402)' : 'over the rate (429)'} without browser recognition says why in one line`, async () => {
+          const { page, state, context, problems } = await session(browser, { ...size, theme, transcribe });
+          await openVoice(page);
+          await page.waitForSelector('.voice-note.is-error', { timeout: 12000 });
+          expect(await page.$eval('.voice-note.is-error', node => node.textContent) === line, 'one line');
+          expect(await page.evaluate(() => document.querySelector('.voice-view') !== null), 'voice mode stays open (the Tutor was not out of messages)');
+          expect(!state.tutor.messages.some(message => message.role === 'user'), 'nothing was sent to the Tutor');
+          await shot(page, `voice-transcribe-${transcribe}-${tag}`);
+          const low = await contrastProblems(page);
+          expect(!low.length, `contrast: ${low.join('; ')}`);
+          expect(!problems.length, problems.join(' | '));
+          await context.close();
+        });
+      }
+
+      await check(`${tag}: transcribe at the cap falls back to the browser's recognition, with a note, and the turn goes to the Tutor`, async () => {
+        const { page, state, context, problems } = await session(browser, { ...size, theme, transcribe: 'cap', recognizer: true, chatDelay: 800 });
+        await openVoice(page);
+        await page.waitForSelector('.voice-note', { timeout: 14000 });
+        await page.waitForFunction(() => document.querySelector('.voice-heard')?.textContent === 'Browser heard this', null, { timeout: 12000 });
+        expect(await page.$eval('.voice-note', node => node.textContent) === "You've used this month's voice listening, so your browser is writing down what you say.", 'one-line note');
+        await page.waitForFunction(() => document.querySelector('.voice-state')?.textContent === 'Speaking', null, { timeout: 12000 });
+        await page.waitForTimeout(3200); // a second turn: the audio is no longer sent once the cap is known
+        expect(state.transcribed === 1, `audio was sent ${state.transcribed} times`);
+        expect(!problems.length, problems.join(' | '));
+        await context.close();
+      });
+
       for (const plan of ['pro', 'free']) {
         await check(`${tag}: Settings › Tutor voice picker (${plan})`, async () => {
           const { page, context, problems } = await session(browser, { ...size, theme, plan });
@@ -252,8 +345,23 @@ const SIZES = [
           expect(radios.join(',') === 'Matilda,Eric,Alice,George', radios.join(','));
           const hear = await page.$('text=Hear Matilda');
           expect(plan === 'pro' ? Boolean(hear) : !hear, 'Hear button only with the cloud voice');
-          await page.click('[aria-labelledby="tutor-voice-title"] [role="radio"]:has-text("Alice")');
-          expect(await page.evaluate(() => localStorage.getItem('cordiaTutorVoice')) === 'alice', 'saved on the device');
+          // force: Playwright treats an aria-disabled button as not clickable and would wait; a student's click is what is tested.
+          await page.click('[aria-labelledby="tutor-voice-title"] [role="radio"]:has-text("Alice")', { force: true });
+          if (plan === 'free') {
+            expect(await page.evaluate(() => localStorage.getItem('cordiaTutorVoice')) === null, 'Free: the picker is preview-only, nothing is saved');
+            const states = await page.$$eval('[aria-labelledby="tutor-voice-title"] [role="radio"]', items => items.map(item => [item.getAttribute('aria-disabled'), item.disabled, item.getAttribute('aria-checked')].join('/')));
+            expect(states.join(',') === 'true/false/true,true/false/false,true/false/false,true/false/false', `radios: ${states.join(',')}`);
+            expect(await page.$eval('[aria-labelledby="tutor-voice-title"]', node => node.getAttribute('aria-describedby')) === 'tutor-voice-note', 'described by the note that says why');
+            expect(await page.$eval('#tutor-voice-note', node => /come with Pro/.test(node.textContent)), 'the existing explanation');
+          } else {
+            expect(await page.evaluate(() => localStorage.getItem('cordiaTutorVoice')) === 'alice', 'saved on the device');
+          }
+          // The four voices: one row on a wide screen; two rows of two at phone width, never three and one on its own.
+          const rows = await page.$$eval('[aria-labelledby="tutor-voice-title"] [role="radio"]', items => {
+            const tops = items.map(item => Math.round(item.getBoundingClientRect().top));
+            return [...new Set(tops)].map(top => tops.filter(value => value === top).length);
+          });
+          expect(size.width > 520 ? rows.join() === '4' : rows.join() === '2,2', `voice rows: ${rows.join()}`);
           await page.$eval('#tutor-voice-title', node => node.closest('.settings-card').scrollIntoView({ block: 'center' }));
           await shot(page, `settings-tutor-${plan}-${tag}`);
           await page.$eval('#tutor-voice-title', node => node.closest('.settings-card').classList.add('qa-voice-card'));
