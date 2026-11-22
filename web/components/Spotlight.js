@@ -2,8 +2,12 @@ import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 const useIsoLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 import { createPortal } from 'react-dom';
+import { cutoutRadii, holePath, placeLabel, placeSkip } from '../lib/spotlightLayout.mjs';
 
 const PAD = 8;
+
+const CORNERS = ['borderTopLeftRadius', 'borderTopRightRadius', 'borderBottomRightRadius', 'borderBottomLeftRadius'];
+const sameBox = (a, b) => Boolean(a && b) && ['top', 'left', 'width', 'height'].every(key => Math.abs(a[key] - b[key]) < 0.5);
 
 function visibleElement(selector) {
   const nodes = [...document.querySelectorAll(selector)];
@@ -23,13 +27,23 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
   // The label's real size, so it can be kept fully on screen (it wraps on narrow screens).
   const labelRef = useRef(null);
   const [labelSize, setLabelSize] = useState({ w: 0, h: 0 });
+  // Skip's size too, so it can be placed clear of the control, the label and the Tutor button.
+  const skipRef = useRef(null);
+  const [skipSize, setSkipSize] = useState({ w: 80, h: 44 });
   useIsoLayoutEffect(() => {
     const node = labelRef.current;
-    if (!node) return;
-    const w = node.offsetWidth;
-    const h = node.offsetHeight;
-    if (Math.abs(w - labelSize.w) > 0.5 || Math.abs(h - labelSize.h) > 0.5) setLabelSize({ w, h });
+    if (node) {
+      const w = node.offsetWidth;
+      const h = node.offsetHeight;
+      if (Math.abs(w - labelSize.w) > 0.5 || Math.abs(h - labelSize.h) > 0.5) setLabelSize({ w, h });
+    }
+    const skip = skipRef.current;
+    if (skip && (Math.abs(skip.offsetWidth - skipSize.w) > 0.5 || Math.abs(skip.offsetHeight - skipSize.h) > 0.5)) setSkipSize({ w: skip.offsetWidth, h: skip.offsetHeight });
   });
+  // The Tutor button (TutorBubble), when it is on screen: neither Skip nor the label may cover it.
+  const [tutor, setTutor] = useState(null);
+  // The phone tab bar: the label rests above it rather than over it.
+  const [tabbar, setTabbar] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -47,10 +61,19 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           }
         }
         const box = element.getBoundingClientRect();
-        setRect(current => (current && Math.abs(current.top - box.top) < 0.5 && Math.abs(current.left - box.left) < 0.5 && Math.abs(current.width - box.width) < 0.5 && Math.abs(current.height - box.height) < 0.5
+        // The control's own corners, read every time: the cut-out follows its shape.
+        const style = getComputedStyle(element);
+        const corners = CORNERS.map(key => style[key]);
+        setRect(current => (sameBox(current, box) && current.corners.join() === corners.join()
           ? current
-          : { top: box.top, left: box.left, width: box.width, height: box.height }));
+          : { top: box.top, left: box.left, width: box.width, height: box.height, corners }));
       } else setRect(null);
+      const bubble = visibleElement('.c-tutor-bubble');
+      const tb = bubble && bubble.getBoundingClientRect();
+      setTutor(current => (tb ? (sameBox(current, tb) ? current : { top: tb.top, left: tb.left, width: tb.width, height: tb.height }) : null));
+      const bar = visibleElement('.c-tabbar');
+      const bb = bar && bar.getBoundingClientRect();
+      setTabbar(current => (bb ? (sameBox(current, bb) ? current : { top: bb.top, left: bb.left, width: bb.width, height: bb.height }) : null));
       frame.current = window.setTimeout(measure, 120);
     }
     measure();
@@ -66,31 +89,42 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
     right: Math.min(vw, rect.left + rect.width + PAD),
     bottom: Math.min(vh, rect.top + rect.height + PAD),
   };
+  // The cut-out's corners: the control's own radius plus the padding, so a pill gets a pill.
+  const radii = hole ? cutoutRadii(rect.corners, { w: rect.width, h: rect.height }, { w: hole.right - hole.left, h: hole.bottom - hole.top }, PAD) : null;
+  const edges = r => r && { top: r.top, left: r.left, right: r.left + r.width, bottom: r.top + r.height };
+  const inside = (inner, outer) => Boolean(inner && outer) && inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom;
+  const tutorBox = edges(tutor);
+  const tabbarBox = edges(tabbar);
+  // The Tutor button never sits under the label, unless it is the spotlighted control itself; the
+  // label rests above the phone tab bar unless the control is in it.
+  const covered = inside(tutorBox, hole);
+  const keepClear = [!covered && tutorBox, hole && !inside(hole, tabbarBox) && tabbarBox].filter(Boolean);
 
   // Label beside the control: below if there is room, else above; arrow points at it. It is
-  // measured and kept 16px inside the screen on every side, with the arrow still on the control.
+  // measured and kept 16px inside the screen on every side, with the arrow still on the control,
+  // and moved off the Tutor button.
   const EDGE = 16;
   let labelStyle = { left: '50%', bottom: 96, transform: 'translateX(-50%)' };
   let arrow = 'none';
+  let labelBox = null;
   if (hole) {
     const lw = labelSize.w;
     const lh = labelSize.h || 48;
+    const spot = placeLabel({ vw, vh, hole, size: { w: lw, h: lh }, avoid: keepClear, edge: EDGE });
     const targetX = (hole.left + hole.right) / 2;
-    const left = Math.max(EDGE, Math.min(vw - EDGE - lw, targetX - lw / 2));
-    const arrowX = Math.max(22, Math.min(lw - 22, targetX - left));
-    const below = hole.bottom + 14;
-    const above = hole.top - 14 - lh;
-    let top;
-    if (below + lh <= vh - EDGE) { top = below; arrow = 'up'; }
-    else if (above >= EDGE) { top = above; arrow = 'down'; }
-    else { top = Math.max(EDGE, vh - EDGE - lh); arrow = 'none'; }
-    labelStyle = { top, left, '--arrow-x': `${arrowX}px` };
+    const arrowX = Math.max(22, Math.min(lw - 22, targetX - spot.left));
+    arrow = spot.arrow;
+    labelStyle = { top: spot.top, left: spot.left, '--arrow-x': `${arrowX}px` };
+    labelBox = { top: spot.top, left: spot.left, right: spot.left + lw, bottom: spot.top + lh };
   }
 
-  // Skip sits bottom-right on desktop and just under the top bar on phones, and moves left if
-  // it would cover the spotlighted control.
+  // Skip: bottom-right on desktop, left of the Tutor button; under the top bar on phones. It moves
+  // on if it would cover the control, the label or the Tutor button.
   const phone = vw < 768;
-  const skipLeft = hole && (phone ? hole.top < 128 && hole.bottom > 64 && hole.right > vw - 140 : hole.bottom > vh - 84 && hole.right > vw - 160);
+  const rootStyle = getComputedStyle(document.documentElement);
+  const barH = parseFloat(rootStyle.getPropertyValue('--bar-h')) || 64;
+  const tabbarH = parseFloat(rootStyle.getPropertyValue('--tabbar-h')) || 64;
+  const skipSpot = placeSkip({ vw, vh, phone, size: skipSize, avoid: [hole, labelBox].filter(Boolean), tutor: covered ? null : tutorBox, barH, tabbarH });
 
   const dots = (
     <span className="spot-dots" aria-label={`${index + 1} of ${total}`}>
@@ -103,11 +137,9 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
     <div className="spot" role="dialog" aria-modal="false" aria-label={`Walkthrough: ${label}`}>
       {hole ? (
         <>
-          <div className="spot-dim" style={{ top: 0, left: 0, right: 0, height: hole.top }} />
-          <div className="spot-dim" style={{ top: hole.bottom, left: 0, right: 0, bottom: 0 }} />
-          <div className="spot-dim" style={{ top: hole.top, left: 0, width: hole.left, height: hole.bottom - hole.top }} />
-          <div className="spot-dim" style={{ top: hole.top, left: hole.right, right: 0, height: hole.bottom - hole.top }} />
-          <div className="spot-ring" style={{ top: hole.top, left: hole.left, width: hole.right - hole.left, height: hole.bottom - hole.top }} />
+          {/* One dim layer with the cut-out clipped from it: clicks reach only the control. */}
+          <div className="spot-dim" style={{ inset: 0, clipPath: `path(evenodd, '${holePath(vw, vh, hole, radii)}')` }} />
+          <div className="spot-ring" style={{ top: hole.top, left: hole.left, width: hole.right - hole.left, height: hole.bottom - hole.top, borderRadius: radii.map(r => `${r}px`).join(' ') }} />
         </>
       ) : !passive && <div className="spot-dim" style={{ inset: 0, background: 'var(--scrim)', pointerEvents: 'none' }} />}
 
@@ -118,12 +150,13 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
           {finishable && <button type="button" className="c-btn c-btn--quiet spot-finish" onClick={onFinish}>Done</button>}
         </div>
       )}
-      <button type="button" className={'spot-skip' + (skipLeft ? ' is-left' : '')} onClick={onSkip}>Skip</button>
+      <button ref={skipRef} type="button" className="spot-skip" style={{ top: skipSpot.top, left: skipSpot.left }} onClick={onSkip}>Skip</button>
 
       <style jsx>{`
         .spot { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
         .spot-dim { position: fixed; background: var(--spot-dim); pointer-events: auto; }
-        .spot-ring { position: fixed; border-radius:12px; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint), 0 0 32px 8px var(--olive-tint); pointer-events: none; transition: top var(--dur) var(--ease), left var(--dur) var(--ease), width var(--dur) var(--ease), height var(--dur) var(--ease); }
+        /* The cut-out in the dim layer is not animated, so the ring is not either: it sits on the hole at every frame. */
+        .spot-ring { position: fixed; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint); pointer-events: none; }
         .spot-label {
           position: fixed; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 16px; max-width: calc(100vw - 32px); box-sizing: border-box;
           border-radius:22px; pointer-events: auto;
@@ -144,17 +177,15 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
         .spot :global(.spot-dots i.is-now) { background: var(--olive); width: 16px; }
         .spot :global(.spot-dots .c-meta) { margin-left: 6px; }
         .spot-skip {
-          position: fixed; top: calc(var(--bar-h, 64px) + 12px); right: 12px; height: 44px; padding: 0 20px; pointer-events: auto;
+          position: fixed; height: 44px; padding: 0 20px; pointer-events: auto;
           border-radius:999px; border: 1px solid var(--glass-edge);
           background: var(--glass); -webkit-backdrop-filter: blur(24px) saturate(160%); backdrop-filter: blur(24px) saturate(160%);
           color: var(--ink); font:600 0.9375rem/1 var(--font-sans); cursor: pointer;
         }
-        .spot-skip.is-left { right: auto; left: 12px; }
-        @media (min-width: 768px) { .spot-skip { top: auto; bottom: 24px; right: 24px; } .spot-skip.is-left { left: 24px; } }
         .spot-finish { height: 36px; min-height: 36px; }
         @keyframes spot-in { from { opacity: 0; } to { opacity: 1; } }
         @media (max-width: 767px) { .spot :global(.spot-dots i) { display: none; } .spot :global(.spot-dots .c-meta) { margin-left: 0; } .spot-label { font-size: 0.9375rem; } }
-        @media (prefers-reduced-motion: reduce) { .spot-ring { transition: none; } .spot-label { animation: none; } }
+        @media (prefers-reduced-motion: reduce) { .spot-label { animation: none; } }
       `}</style>
     </div>,
     document.body,

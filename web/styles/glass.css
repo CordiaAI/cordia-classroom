@@ -147,11 +147,11 @@
 }
 
 /* ---------- Selected items: selected glass ----------
-   The current place in the sidebar and nav, a pressed chip or toggle, the chosen pill or search hit:
+   The current place in the sidebar and nav, a pressed chip or toggle, the chosen pill (the search palette's active row has its own ring, in SearchModal):
    olive tint over raised glass, ink text, an olive icon. The chosen segment is the sliding pill
    (--seg-pill-bg). */
 :is(.c-side .c-side-item[aria-current='page'], .c-nav a[aria-current='page'], .c-tabbar a[aria-current='page'],
-  .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .c-search-hit.is-active,
+  .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'],
   .c-nav .c-nav-btn[aria-pressed='true'], .tutor-chats-btn[aria-pressed='true'],
   .c-icon-btn:is([aria-pressed='true'], .is-on):not(:disabled)) {
   background: var(--selected-glass) !important;
@@ -164,7 +164,7 @@
    (tokens.css --pill-current-bg). */
 .c-pill.c-pill:is([aria-current='page'], [aria-selected='true']) { background: var(--pill-current-bg) !important; box-shadow: var(--pill-current-shadow) !important; }
 :is(.c-side .c-side-item[aria-current='page'], .c-nav a[aria-current='page'], .c-tabbar a[aria-current='page'],
-  .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'], .c-search-hit.is-active,
+  .c-pill[aria-current='page'], .c-pill[aria-selected='true'], .c-chip[aria-pressed='true'],
   .c-nav .c-nav-btn[aria-pressed='true'], .tutor-chats-btn[aria-pressed='true'],
   .c-icon-btn:is([aria-pressed='true'], .is-on)) :is(svg.lucide, .lucide) { color: var(--icon-pressed, var(--olive-ink)) !important; }
 /* A star is a mark, not a primary action: a pressed star reads --meter-ink (the accent, or ink under Paper & Clay).

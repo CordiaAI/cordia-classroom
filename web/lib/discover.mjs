@@ -17,13 +17,22 @@ export function explorePath(q = '', { tab = '', ...filters } = {}) {
 }
 
 // The search panel's group under the student's own results: up to three public sets, then
-// "See all in Discover".
-export function publicSetRows(guides, query) {
+// "See all in Discover". owned: guide ids the student already has (lib/searchResults.mjs
+// ownedGuideIds); those sets are left out before the three are picked, so they never show twice.
+export function publicSetRows(guides, query, owned = new Set()) {
   const q = String(query || '').trim();
   if (!q) return [];
-  const rows = (Array.isArray(guides) ? guides : []).slice(0, 3).map(guide => ({
+  const seen = new Set();
+  const fresh = (Array.isArray(guides) ? guides : []).filter(guide => {
+    const id = String(guide?.id || '');
+    if (!id || owned.has(id) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  const rows = fresh.slice(0, 3).map(guide => ({
     key: 'p' + guide.id,
     kind: 'public',
+    id: guide.id,
     title: guide.title || 'Untitled',
     meta: guide.studied_by ? `Studied by ${guide.studied_by}` : (guide.author?.display_name || ''),
     href: '/sets/' + guide.id,
