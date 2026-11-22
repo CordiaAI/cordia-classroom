@@ -76,7 +76,7 @@ export default function Explore() {
           <Search {...ICON} />
           <label className="sr-only" htmlFor="ex-q">Search everyone's public sets, classrooms and people</label>
           <input id="ex-q" className="c-input" type="search" value={draft} maxLength={200} autoComplete="off" spellCheck={false}
-            placeholder="Search public sets, classrooms and people" onChange={event => onType(event.target.value)} />
+            placeholder="Search sets, classrooms, people" onChange={event => onType(event.target.value)} />
           {draft && <button type="button" className="c-search-clear" aria-label="Clear search" onClick={() => { setDraft(''); update({ q: '' }); }}><X size={18} strokeWidth={1.75} aria-hidden="true" /></button>}
         </form>
         <SegmentedControl kind="tabs" label="Discover" className="ex-tabs" scroller onKeyDown={onTabKey}>
@@ -86,7 +86,7 @@ export default function Explore() {
           ))}
         </SegmentedControl>
       </div>
-      <div id={`expanel-${tab}`} role="tabpanel" aria-labelledby={`extab-${tab}`} className="ex-panel">
+      <div id={`expanel-${tab}`} role="tabpanel" aria-labelledby={`extab-${tab}`} className="ex-panel" tabIndex={-1}>
         {tab === 'guides' && <GuidesPanel q={q} filters={filters} onFilter={update} onClear={clear} />}
         {tab === 'classrooms' && <ClassroomsPanel q={q} onClear={clear} onBrowse={() => update({ tab: 'guides' })} />}
         {tab === 'people' && <PeoplePanel q={q} onClear={clear} />}
@@ -98,7 +98,7 @@ export default function Explore() {
         .ex-search { width: 100%; }
         :global(.ex-tabs) { justify-self: start; max-width: 100%; }
         :global(.ex-tabs) button { white-space: nowrap; }
-        .ex-panel { display: grid; gap: 16px; min-width: 0; }
+        .ex-panel { display: grid; gap: 16px; min-width: 0; outline: none; }
       `}</style>
     </div>
   );
@@ -180,7 +180,7 @@ function GuidesPanel({ q, filters, onFilter, onClear }) {
   const action = copy.action === 'library' ? { label: copy.label, href: '/library' } : { label: copy.label, onClick: onClear };
   return (
     <>
-      <div className="exg-filters" aria-label="Filters" role="group">
+      {!(empty && !narrowed) && <div className="exg-filters" aria-label="Filters" role="group">
         <Select label="School" value={filters.school} options={pick(facets.schools, filters.school, 'Any school')} onChange={value => set('school', value)} />
         <Select label="Course" value={filters.course} options={pick(facets.courses, filters.course, 'Any course')} onChange={value => set('course', value)} />
         <Select label="Term" value={filters.term} options={pick(facets.terms, filters.term, 'Any term')} onChange={value => set('term', value)} />
@@ -190,13 +190,13 @@ function GuidesPanel({ q, filters, onFilter, onClear }) {
         {CLASSROOMS_ON && (
           <label className="exg-check"><input type="checkbox" checked={filters.from_my_classrooms === 'true'} onChange={event => set('from_my_classrooms', event.target.checked ? 'true' : '')} /><span>From my classrooms</span></label>
         )}
-      </div>
+      </div>}
       {failed && <DiscoverRetry what="public sets" onRetry={() => setTries(count => count + 1)} />}
       {!failed && data === null && <DiscoverLoading label="Finding sets" />}
       {empty && <DiscoverEmpty message={copy.message} action={action} />}
       {empty && suggestions.map(group => <SetGroup key={group.key} id={`exs-${group.key}`} title={group.title} sets={group.sets} compact />)}
-      {guides.length > 0 && !narrowed && <h2 className="exg-heading">Popular public sets</h2>}
-      {guides.length > 0 && (
+      {guides.length > 0 && !narrowed && <SetGroup id="exs-listed" title="Popular public sets" sets={guides} />}
+      {guides.length > 0 && narrowed && (
         <ul className="exg-list" aria-label="Public sets">
           {guides.map(guide => <SetCard key={guide.id} guide={guide} />)}
         </ul>
@@ -209,7 +209,6 @@ function GuidesPanel({ q, filters, onFilter, onClear }) {
         .exg-check { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); cursor: pointer; }
         .exg-check input { width: 18px; height: 18px; accent-color: var(--olive); flex: none; }
         @media (max-width: 640px) { .exg-check { grid-column: 1 / -1; } }
-        .exg-heading { margin: 8px 0 -6px; color: var(--ink); font: 600 var(--fs-15)/1.3 var(--font-sans); }
         .exg-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
         .exg-more { justify-self: center; }
       `}</style>

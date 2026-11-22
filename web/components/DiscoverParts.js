@@ -28,6 +28,16 @@ export function DiscoverLoading({ label = 'Loading' }) {
   );
 }
 
+// The button that was just pressed leaves the page (the list or the mark replaces it), so keyboard focus
+// moves to the tab panel instead of falling back to the top of the document.
+function keepFocus(event, run) {
+  const button = event.currentTarget;
+  const panel = button.closest('[role="tabpanel"]');
+  run();
+  // An action that moves focus itself ("Search people") keeps it; otherwise the panel takes it.
+  if (document.activeElement === button) panel?.focus({ preventScroll: true });
+}
+
 // One short sentence and one clear action, padded and centered in a pane of glass. No picture.
 // `action` is { label, href } or { label, onClick }. `alert` is for a failure.
 export function DiscoverEmpty({ message, action, alert = false }) {
@@ -36,7 +46,7 @@ export function DiscoverEmpty({ message, action, alert = false }) {
       <p className="dp-empty-message" role={alert ? 'alert' : 'status'}>{message}</p>
       {action && (action.href
         ? <Link href={action.href} className="c-btn c-btn--secondary">{action.label}</Link>
-        : <button type="button" className="c-btn c-btn--secondary" onClick={action.onClick}>{action.label}</button>)}
+        : <button type="button" className="c-btn c-btn--secondary" onClick={event => keepFocus(event, action.onClick)}>{action.label}</button>)}
       <style jsx>{`
         .dp-empty { display: grid; justify-items: center; gap: 16px; padding: 48px 24px; text-align: center; }
         .dp-empty-message { margin: 0; max-width: 34ch; color: var(--ink); font: 500 var(--fs-17)/1.45 var(--font-sans); text-wrap: balance; }
@@ -86,6 +96,7 @@ export function SetCard({ guide, compact = false }) {
         .exg-badge { display: inline-flex; align-items: center; gap: 4px; font: 600 var(--fs-13)/1.3 var(--font-sans); color: var(--meter-ink); }
         .exg-facts { margin: 0; overflow-wrap: anywhere; }
         .exg-similar { display: grid; gap: 4px; justify-items: start; }
+        .exg-similar :global(.c-btn) { margin-left: -12px; }
         .exg-similar :global(.exg-flip) { transform: rotate(180deg); }
         .exg-similar-list { margin: 0; padding-left: 20px; display: grid; gap: 4px; }
         .exg-similar-list :global(a) { color: var(--ink); overflow-wrap: anywhere; }

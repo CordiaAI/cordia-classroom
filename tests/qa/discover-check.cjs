@@ -91,6 +91,7 @@ async function main() {
         const padding = await page.locator('.dp-empty').evaluate(node => parseFloat(getComputedStyle(node).paddingTop));
         expect(padding >= 36, 'padded, is ' + padding);
         expect(await page.locator('.dp-group').count() === 0, 'nothing to suggest, so nothing shown');
+        expect(await page.locator('.exg-filters').count() === 0, 'no filters when there is nothing to filter');
         await shot(page, `${tag}-empty-catalogue`);
         await context.close();
       });
@@ -115,6 +116,7 @@ async function main() {
         await shot(page, `${tag}-error`);
         state.discover.fail = false;
         await page.getByRole('button', { name: 'Try again' }).click();
+        await page.waitForFunction(() => document.activeElement?.getAttribute('role') === 'tabpanel', null, { timeout: 2000 }).catch(() => { throw new Error('focus should stay in the panel, not fall to the page'); });
         await page.waitForSelector('.exg-card');
         await context.close();
       });
