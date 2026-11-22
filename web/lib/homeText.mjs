@@ -26,11 +26,16 @@ export function homeHeadline(exam, plan, className = '') {
   const day = examDay(exam.date, exam.daysLeft);
   const name = String(className || '').trim();
   const title = name ? `${day} is your ${name} exam.` : `${day} is ${String(exam.title || 'your exam').trim()}.`;
-  if (!plan || plan.past) return { title, line: '' };
-  const line = plan.remaining > 0
+  return { title, line: examPace(plan) };
+}
+
+// What's left and today's pace for an exam (plan: lib/learnEngine.mjs testPlan), or '' without one.
+// The home's headline and the class page's exam card say it the same way.
+export function examPace(plan) {
+  if (!plan || plan.past) return '';
+  return plan.remaining > 0
     ? `${plural(plan.remaining, 'idea', 'ideas')} left to master. ${plan.perDay} today keeps you on pace.`
     : 'Every idea is mastered. A short review keeps it that way.';
-  return { title, line };
 }
 
 const shorten = (text, max = 40) => {

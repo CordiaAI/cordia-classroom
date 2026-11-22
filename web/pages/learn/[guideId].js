@@ -281,6 +281,9 @@ export default function LearnPage() {
       setRoundNumber(pending.roundNumber);
       setScreen('round');
       roundStart.current = Date.now();
+    } else if (router.query.mode === 'timed' && list.length) {
+      // The class page's exam card ("Timed practice test", ?mode=timed) opens the timed test.
+      setScreen('timed');
     }
     if (linked || resumable) save(restored, linked || saved.test_date || '', list, format);
     if (router.query.checkin === '1' && list.length && !guide?.viewer && !checkinSeen.current) {

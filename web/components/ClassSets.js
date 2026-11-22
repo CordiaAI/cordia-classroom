@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
-import { Bookmark, Check, Flag, Layers } from 'lucide-react';
+import { Bookmark, CalendarCheck, Check, Flag, Layers, Undo2 } from 'lucide-react';
 import { apiFetch, apiErrorMessage } from '../lib/api';
+import { setDeadlineDone } from '../lib/canvas';
 import DoneCheck from './DoneCheck';
 import { SectionLoader } from './CordiaLoader';
 import Menu from './Menu';
@@ -51,7 +52,7 @@ function SetRow({ entry, onSaved, onReported }) {
           items={versions.map((version, i) => ({ label: `${version.title} · ${version.card_count} cards`, current: i === index, onSelect: () => setIndex(i) }))}
         />
       )}
-      {item.mine ? <span className="c-meta">Yours</span> : (
+      {item.mine ? <span className="cp-chip">Yours</span> : (
         <button type="button" className="c-btn c-btn--secondary" onClick={save} disabled={busy || item.saved}>
           {item.saved ? <><Check {...ICON} />Saved</> : <><Bookmark {...ICON} />Save</>}
         </button>
@@ -59,6 +60,7 @@ function SetRow({ entry, onSaved, onReported }) {
       {!item.mine && (
         <Menu
           label={`More for ${item.title}`}
+          triggerClassName="c-icon-btn cls-more"
           items={[{ label: 'Report', icon: Flag, items: REASONS.map(([key, label]) => ({ label, onSelect: () => report(key) })) }]}
         />
       )}
@@ -93,32 +95,50 @@ export function ClassSets({ classId, onToast, initial }) {
   );
 }
 
-// Your own Canvas deadlines for this class.
-export function ClassDeadlines({ classId, deadlines }) {
+// Your own Canvas deadlines for this class. onOpen (the class page in the new shell): each title
+// opens that deadline's assignment sheet.
+export function ClassDeadlines({ classId, deadlines, onOpen }) {
   if (!classId) return null;
   if (!deadlines) return <SectionLoader height={120} label="Loading deadlines" />;
   if (!deadlines.length) return <p className="cp-line">No deadlines</p>;
   return (
     <ul className="c-card cp-list">
       {deadlines.map((item, index) => (
-        <DeadlineRow key={item.id || index} item={item} />
+        <DeadlineRow key={item.id || index} item={item} onOpen={onOpen} />
       ))}
       <ClassStyles />
     </ul>
   );
 }
 
-function DeadlineRow({ item }) {
+function DeadlineRow({ item, onOpen }) {
   const [done, setDone] = useState(Boolean(item.done));
+  // The ⋯ (the class page in the new shell): plan it, or mark it done or not done like the box does.
+  async function toggle() {
+    const next = !done;
+    setDone(next);
+    if (!(await setDeadlineDone(item.id, next))) setDone(!next);
+  }
   const late = !done && new Date(item.due_at) < new Date();
+  const main = (
+    <>
+      <span className="cp-title c-truncate">{item.title}</span>
+      {(item.submitted || late) && <span className="c-meta">{item.submitted ? 'Turned in on Canvas' : 'Past due'}</span>}
+    </>
+  );
   return (
     <li className={'cp-row cp-deadline' + (done ? ' is-done' : '')}>
       {item.id && <DoneCheck id={item.id} title={item.title} done={done} onChange={setDone} />}
-      <span className="cp-main">
-        <span className="cp-title c-truncate">{item.title}</span>
-        {(item.submitted || late) && <span className="c-meta">{item.submitted ? 'Turned in on Canvas' : 'Past due'}</span>}
-      </span>
+      {onOpen && item.id
+        ? <button type="button" className="cp-main cp-open" onClick={() => onOpen({ ...item, done })}>{main}</button>
+        : <span className="cp-main">{main}</span>}
       <span className="c-meta cp-due">{dueLabel(item.due_at)}</span>
+      {onOpen && item.id && (
+        <Menu label={`More for ${item.title}`} triggerClassName="c-icon-btn cls-more" items={[
+          { label: 'Plan it', icon: CalendarCheck, onSelect: () => onOpen({ ...item, done }) },
+          { label: done ? 'Mark not done' : 'Mark done', icon: done ? Undo2 : Check, onSelect: toggle },
+        ]} />
+      )}
     </li>
   );
 }
@@ -134,10 +154,16 @@ function ClassStyles() {
         .cp-title { font: 500 1.0625rem/1.3 var(--font-sans); }
         .cp-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-variant-numeric: tabular-nums; }
         .cp-versions { font: 600 0.8125rem/1 var(--font-sans); white-space: nowrap; }
+        /* Your own shared set: a quiet chip, padded and centred on the row. */
+        .cp-chip { flex: none; display: inline-flex; align-items: center; align-self: center; height: 28px; padding: 0 12px; border-radius: var(--r-pill); background: var(--glass-inner); box-shadow: var(--glass-inner-shadow); color: var(--muted); font: 600 0.8125rem/1 var(--font-sans); white-space: nowrap; }
+        .cp-row:has(.cp-chip) { padding-right: 16px; }
         .cp-row .c-menu-wrap:has(.cp-versions) > .c-icon-btn { width: auto; padding: 0 12px; border-radius: 999px; }
         .cp-deadline { gap: 14px; }
         .cp-deadline.is-done .cp-title { color: var(--muted); text-decoration: line-through; }
+        .cp-open { align-self: stretch; align-content: center; padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
         .cp-due { font-variant-numeric: tabular-nums; padding-right: 16px; white-space: nowrap; }
+        .cp-deadline:has(.cls-more) .cp-due { padding-right: 0; }
+        .cp-deadline .c-menu-wrap { flex: none; margin-right: 8px; }
         @media (max-width: 767px) { .cp-list { padding-left: 16px; } .cp-row { flex-wrap: wrap; padding: 12px 0; } .cp-main { flex-basis: 100%; } .cp-deadline { flex-wrap: nowrap; } .cp-deadline .cp-main { flex-basis: auto; } }
     `}</style>
   );
