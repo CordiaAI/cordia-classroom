@@ -4,8 +4,11 @@ const useIsomorphicLayoutEffect = typeof window === 'undefined' ? useEffect : us
 
 // A text box that wraps is as wide as the room it was given, so whatever sits beside it (the rename
 // pencil next to a guide title) ends up far from where the text ends. This narrows the element to its
-// widest line, now, once the fonts are in, and whenever its container changes size. `deps` are what
-// can change the text or the element itself. With no layout engine to ask, the box stays as it was.
+// widest line, now, once the fonts are in, and whenever its container changes size. When the first line
+// is shorter than the widest, how much shorter goes to the parent as --first-line-slack, so the neighbour
+// can slide back to sit one gap after the first line (the rows beside a short first line are empty).
+// `deps` are what can change the text or the element itself. With no layout engine to ask, the box
+// stays as it was.
 export default function useShrinkWrap(ref, deps) {
   useIsomorphicLayoutEffect(() => {
     const el = ref.current;
@@ -17,16 +20,26 @@ export default function useShrinkWrap(ref, deps) {
       const box = el.getBoundingClientRect();
       const range = document.createRange();
       range.selectNodeContents(el);
-      const rights = Array.from(range.getClientRects(), rect => rect.right);
-      const widest = rights.length ? Math.max(...rights) - box.left : 0;
+      const rects = Array.from(range.getClientRects()).filter(rect => rect.width > 0);
+      const widest = rects.length ? Math.max(...rects.map(rect => rect.right)) - box.left : 0;
       // A whole pixel more than the widest line, so a fractional width never pushes a word down a line.
       if (widest > 0 && widest + 1 < box.width) el.style.width = `${Math.ceil(widest) + 1}px`;
+      const top = rects.length ? Math.min(...rects.map(rect => rect.top)) : 0;
+      const first = rects.filter(rect => Math.abs(rect.top - top) < 2);
+      const slack = first.length ? Math.max(0, Math.round((widest - (Math.max(...first.map(rect => rect.right)) - box.left)) * 100) / 100) : 0;
+      el.parentElement?.style.setProperty('--first-line-slack', `${slack}px`);
     };
     fit();
+    // Refit when the room changes, when the text re-wraps (a font arriving or a look/size switch), and
+    // once the fonts are in.
     const watch = typeof ResizeObserver === 'function' && el.parentElement ? new ResizeObserver(fit) : null;
     watch?.observe(el.parentElement);
+    watch?.observe(el);
+    const looks = typeof MutationObserver === 'function' ? new MutationObserver(fit) : null;
+    looks?.observe(document.documentElement, { attributes: true, attributeFilter: ['data-look', 'data-font', 'data-size'] });
     document.fonts?.ready?.then(fit);
-    return () => { alive = false; watch?.disconnect(); el.style.width = ''; };
+    document.fonts?.addEventListener?.('loadingdone', fit);
+    return () => { alive = false; watch?.disconnect(); looks?.disconnect(); document.fonts?.removeEventListener?.('loadingdone', fit); el.style.width = ''; el.parentElement?.style.removeProperty('--first-line-slack'); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, deps);
 }

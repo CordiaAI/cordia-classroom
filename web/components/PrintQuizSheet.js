@@ -99,7 +99,7 @@ export default function PrintQuizSheet({ guideId, onClose }) {
                       <div className="pqs-stepper" role="group" aria-label={`${TYPE_NAMES[type]} count`}>
                         <button type="button" className="c-icon-btn pqs-step" onClick={() => step(atMin, count - 1)} aria-disabled={!on || atMin} aria-label={`Fewer ${name}`}><Minus size={16} strokeWidth={2} aria-hidden="true" /></button>
                         {none
-                          ? <span className="pqs-count pqs-count--none">None in this guide</span>
+                          ? <span className="pqs-count pqs-count--none">None in guide</span>
                           : <span className="pqs-count" aria-live="polite"><b>{count}</b>{' '}<span className="pqs-max">of {about.includes(type) ? 'about ' : ''}{max}</span></span>}
                         <button type="button" className="c-icon-btn pqs-step" onClick={() => step(atMax, count + 1)} aria-disabled={!on || atMax}
                           aria-label={atMax ? `More ${name}: ${about.includes(type) ? 'about ' : ''}${max} is the most this guide has` : `More ${name}`}><Plus size={16} strokeWidth={2} aria-hidden="true" /></button>

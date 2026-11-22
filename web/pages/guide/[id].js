@@ -721,9 +721,9 @@ export default function GuidePage() {
         .guide-dup-review:hover { text-decoration: underline; }
         /* The pencil sits one gap after the end of the title's first line and is centred on it, however many
            lines the title wraps to: the title button is narrowed to its widest line (useShrinkWrap, with
-           balanced lines so the first is about as wide), and the pencil's slot is exactly one title line tall. */
+           balanced lines so the first is about as wide), the pencil slides back by whatever a shorter first line leaves, and its slot is exactly one title line tall. */
         .guide-title { --guide-title-size: var(--fs-40); flex: 1 1 0; min-width: 0; display: flex; align-items: flex-start; gap: var(--space-3); overflow-wrap: anywhere; }
-        .guide-rename-slot { --guide-title-line: calc(var(--guide-title-size) * var(--lh-title)); flex: 0 0 auto; display: flex; align-items: flex-start; height: var(--guide-title-line); }
+        .guide-rename-slot { --guide-title-line: calc(var(--guide-title-size) * var(--lh-title)); flex: 0 0 auto; display: flex; align-items: flex-start; height: var(--guide-title-line); transform: translateX(calc(var(--first-line-slack, 0px) * -1)); /* back to one gap after a first line shorter than the widest */ }
         .guide-title :global(.guide-rename-btn) { position: relative; width: var(--icon-btn-s); height: var(--icon-btn-s); margin-block: calc((var(--guide-title-line) - var(--icon-btn-s)) / 2); color: var(--muted); }
         /* A finger needs 44px: the same quiet circle with a larger target around it, measured from the padding box so its border doesn't shorten it. */
         @media (pointer: coarse) { .guide-title :global(.guide-rename-btn)::after { content: ''; position: absolute; inset: calc((var(--hit) - 100%) / -2); } }
