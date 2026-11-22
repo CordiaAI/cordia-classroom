@@ -48,6 +48,10 @@ export default function SearchModal({ onClose, instant = false }) {
   // What Search was opened from: focus goes back there when it closes, and a sheet opened from here hands focus back there.
   const openerRef = useRef(typeof document !== 'undefined' ? document.activeElement : null);
   const handedOffRef = useRef(false);
+  // The field is focused the moment Search opens, so the pill shows the focus ring only when the
+  // keyboard brings focus back to it (Shift Tab from the close button); the caret marks it otherwise.
+  const tabbedRef = useRef(false);
+  const [ringed, setRinged] = useState(false);
 
   useEffect(() => {
     inputRef.current?.focus();
@@ -88,7 +92,7 @@ export default function SearchModal({ onClose, instant = false }) {
     }, 200);
   }, [query]);
 
-  const results = useMemo(() => {
+  const live = useMemo(() => {
     const q = query.trim().toLowerCase();
     // Before typing: the newest guides and notes, and the places people jump to most.
     if (!q) {
@@ -118,6 +122,14 @@ export default function SearchModal({ onClose, instant = false }) {
     return uniqueRows([...guides, ...cards, ...notes, ...settings, ...more]);
   }, [query, guideHits, library, found, publicHits]);
 
+  // While a search is out, the last answered list stays as it is (nothing shuffles under the pointer or
+  // the arrow keys) and the new one replaces it whole when it lands.
+  const q = query.trim();
+  const searching = Boolean(q) && settled !== q;
+  const shownRef = useRef({ query: '', rows: [] });
+  if (!searching) shownRef.current = { query: q, rows: live };
+  const results = searching ? (shownRef.current.query ? shownRef.current.rows : []) : live;
+
   useEffect(() => setActive(0), [results.length]);
 
   function go(result) {
@@ -135,22 +147,21 @@ export default function SearchModal({ onClose, instant = false }) {
 
   const ICON = { setting: Palette, guide: BookOpen, card: Layers, note: NotebookPen, lecture: Mic, recent: BookOpen, jump: ArrowRight, public: Globe, explore: Compass };
   const GROUP = { setting: 'Settings', guide: 'Guides', card: 'Cards', note: 'Notes', lecture: 'Lectures', recent: 'Recent', jump: 'Go to', public: 'Public sets', explore: '' };
-  const q = query.trim();
   const ownCount = results.filter(result => !['explore', 'setting'].includes(result.kind)).length;
-  const searching = Boolean(q) && settled !== q;
   const status = q && !ownCount ? (searching ? 'Searching' : 'Nothing of yours matches') : '';
   const optionId = index => `c-search-option-${index}`;
 
   return (
     <BodyPortal>
     <div className={'c-scrim c-search-scrim' + (instant ? ' is-instant' : '')} onClick={onClose}>
-      <div className="c-search-palette" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
-        <div className="search-pill">
+      <div className="c-search-palette" role="dialog" aria-modal="true" aria-label="Search" onClick={event => event.stopPropagation()} onKeyDown={event => { tabbedRef.current = event.key === 'Tab'; if (event.key === 'Escape') { event.stopPropagation(); onClose(); } }}>
+        <div className={'search-pill' + (ringed ? ' is-ringed' : '')}>
           <Search size={20} strokeWidth={1.75} aria-hidden="true" />
           <label className="sr-only" htmlFor="c-search-input">Search</label>
           <input
             id="c-search-input" ref={inputRef} className="search-input" type="search" placeholder="Search guides, cards, notes and lectures"
             value={query} onChange={event => setQuery(event.target.value)} onKeyDown={onKeyDown}
+            onFocus={() => setRinged(tabbedRef.current)} onBlur={() => setRinged(false)}
             role="combobox" aria-expanded={results.length > 0} aria-controls="c-search-results" aria-autocomplete="list"
             aria-activedescendant={results[active] ? optionId(active) : undefined} autoComplete="off" spellCheck={false}
           />
@@ -197,10 +208,11 @@ export default function SearchModal({ onClose, instant = false }) {
         .search-pill { display: flex; align-items: center; gap: 12px; min-height: 60px; padding: 0 8px 0 20px; border-radius: var(--r-pill); color: var(--muted); }
         .search-bubble { border-radius: var(--r-panel); overflow: hidden; }
         .search-bubble[hidden] { display: none; }
-        .search-input { flex: 1; min-width: 0; height: 58px; padding: 0; border: 0; background: transparent; color: var(--ink); font: 500 1.0625rem/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
+        .search-input { flex: 1; min-width: 0; height: 58px; margin: 0; padding: 0; border: 0; background: transparent; color: var(--ink); font: 500 1.0625rem/1.4 var(--font-sans); outline: none; box-shadow: none; -webkit-appearance: none; appearance: none; }
         .search-input:focus, .search-input:focus-visible { outline: none; border: 0; box-shadow: none; }
-        /* The pill is the field's box, so it takes the app's focus ring (system.css: 2px --focus-ring, 2px out). */
-        .search-pill:has(.search-input:focus-visible) { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
+        /* The pill is the field's box, so it takes the app's focus ring (system.css: 2px --focus-ring, 2px
+           out) when the keyboard moves focus back into it. */
+        .search-pill.is-ringed { outline: 2px solid var(--focus-ring); outline-offset: 2px; }
         .search-input::placeholder { color: var(--muted); }
         .search-input::-webkit-search-cancel-button { display: none; }
         .search-close { flex: none; display: grid; place-items: center; min-width: 44px; height: 44px; border: 0; border-radius: var(--r-pill); background: transparent; color: var(--muted); cursor: pointer; transition: box-shadow var(--dur) var(--ease), background-color var(--dur) var(--ease); }
@@ -212,7 +224,9 @@ export default function SearchModal({ onClose, instant = false }) {
         .search-list:empty { display: none; }
         .c-search-group { padding: 10px 12px 4px; }
         .c-search-hit { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: var(--r-input); background: transparent; color: var(--ink); font: 600 0.9375rem/1.5 var(--font-sans); text-align: left; cursor: pointer; }
-        .c-search-hit :global(.c-meta) { margin-left: auto; max-width: 40%; }
+        /* The title gives way first; a short meta ("Studied by 7") stays whole. */
+        .c-search-hit > :global(.c-truncate:not(.c-meta)) { flex: 0 1 auto; min-width: 0; }
+        .c-search-hit :global(.c-meta) { flex: none; margin-left: auto; max-width: 45%; }
         .c-search-none { margin: 0; padding: 16px 20px; }
         .c-search-none + .search-list { padding-top: 0; }
         @media (max-width: 767px) {

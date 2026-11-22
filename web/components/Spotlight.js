@@ -42,6 +42,8 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
   });
   // The Tutor button (TutorBubble), when it is on screen: neither Skip nor the label may cover it.
   const [tutor, setTutor] = useState(null);
+  // The phone tab bar: the label rests above it rather than over it.
+  const [tabbar, setTabbar] = useState(null);
 
   useEffect(() => {
     let alive = true;
@@ -69,6 +71,9 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
       const bubble = visibleElement('.c-tutor-bubble');
       const tb = bubble && bubble.getBoundingClientRect();
       setTutor(current => (tb ? (sameBox(current, tb) ? current : { top: tb.top, left: tb.left, width: tb.width, height: tb.height }) : null));
+      const bar = visibleElement('.c-tabbar');
+      const bb = bar && bar.getBoundingClientRect();
+      setTabbar(current => (bb ? (sameBox(current, bb) ? current : { top: bb.top, left: bb.left, width: bb.width, height: bb.height }) : null));
       frame.current = window.setTimeout(measure, 120);
     }
     measure();
@@ -86,10 +91,14 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
   };
   // The cut-out's corners: the control's own radius plus the padding, so a pill gets a pill.
   const radii = hole ? cutoutRadii(rect.corners, { w: rect.width, h: rect.height }, { w: hole.right - hole.left, h: hole.bottom - hole.top }, PAD) : null;
-  const tutorBox = tutor && { top: tutor.top, left: tutor.left, right: tutor.left + tutor.width, bottom: tutor.top + tutor.height };
-  // The Tutor button never sits under the label, unless it is the spotlighted control itself.
-  const covered = tutorBox && hole && tutorBox.left >= hole.left && tutorBox.right <= hole.right && tutorBox.top >= hole.top && tutorBox.bottom <= hole.bottom;
-  const keepClear = tutorBox && !covered ? [tutorBox] : [];
+  const edges = r => r && { top: r.top, left: r.left, right: r.left + r.width, bottom: r.top + r.height };
+  const inside = (inner, outer) => Boolean(inner && outer) && inner.left >= outer.left && inner.right <= outer.right && inner.top >= outer.top && inner.bottom <= outer.bottom;
+  const tutorBox = edges(tutor);
+  const tabbarBox = edges(tabbar);
+  // The Tutor button never sits under the label, unless it is the spotlighted control itself; the
+  // label rests above the phone tab bar unless the control is in it.
+  const covered = inside(tutorBox, hole);
+  const keepClear = [!covered && tutorBox, hole && !inside(hole, tabbarBox) && tabbarBox].filter(Boolean);
 
   // Label beside the control: below if there is room, else above; arrow points at it. It is
   // measured and kept 16px inside the screen on every side, with the arrow still on the control,
@@ -146,7 +155,7 @@ export default function Spotlight({ target, label, index, total, onSkip, passive
       <style jsx>{`
         .spot { position: fixed; inset: 0; z-index: 400; pointer-events: none; }
         .spot-dim { position: fixed; background: var(--spot-dim); pointer-events: auto; }
-        .spot-ring { position: fixed; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint), 0 0 32px 8px var(--olive-tint); pointer-events: none; transition: top var(--dur) var(--ease), left var(--dur) var(--ease), width var(--dur) var(--ease), height var(--dur) var(--ease), border-radius var(--dur) var(--ease); }
+        .spot-ring { position: fixed; box-shadow: 0 0 0 2px var(--olive), 0 0 0 8px var(--olive-tint); pointer-events: none; transition: top var(--dur) var(--ease), left var(--dur) var(--ease), width var(--dur) var(--ease), height var(--dur) var(--ease), border-radius var(--dur) var(--ease); }
         .spot-label {
           position: fixed; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 16px; max-width: calc(100vw - 32px); box-sizing: border-box;
           border-radius:22px; pointer-events: auto;

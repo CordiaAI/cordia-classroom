@@ -52,14 +52,16 @@ test('each row shows once, by its stable key, in order', () => {
   assert.deepEqual(found.map(row => row.key), ['guideg1:', 'cardg1:0', 'cardg1:1']);
 });
 
-test('the palette is a glass pill over a separate glass results bubble 8px below, with the app focus ring', async () => {
+test('the palette is a glass pill over a separate glass results bubble 8px below, with the app focus ring from the keyboard', async () => {
   const search = await source('components/SearchModal.js');
-  assert.match(search, /className="search-pill"/);
+  assert.match(search, /'search-pill' \+ \(ringed/);
   assert.match(search, /className="search-bubble"/);
   assert.match(search, /\.c-search-palette \{ display: grid; gap: 8px;/);
   assert.match(search, /backdrop-filter: var\(--glass-blur\)/);
   assert.match(search, /background: var\(--glass-sheen\), var\(--glass-fill-strong\)/);
-  assert.match(search, /\.search-pill:has\(\.search-input:focus-visible\) \{ outline: 2px solid var\(--focus-ring\); outline-offset: 2px; \}/);
+  // No ring while the field is simply open and typed in; the app's own ring when the keyboard brings focus back.
+  assert.match(search, /\.search-pill\.is-ringed \{ outline: 2px solid var\(--focus-ring\); outline-offset: 2px; \}/);
+  assert.match(search, /onFocus=\{\(\) => setRinged\(tabbedRef\.current\)\}/);
   // Listbox semantics, with the field pointing at the active option.
   assert.match(search, /role="listbox"/);
   assert.match(search, /role="option"/);
