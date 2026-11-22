@@ -22,7 +22,7 @@ from services import print_items, retain
 from services import blanks
 from services.choice_shapes import conform, is_value, repair, shape
 from services.distractor_check import keep_valid
-from services.entitlements import LIMITS, plan_for, record, remaining, require, subscription_row
+from services.entitlements import LIMITS, next_reset, plan_for, record, remaining, require, subscription_row
 
 
 logger = logging.getLogger(__name__)
@@ -80,7 +80,9 @@ class MissRequest(BaseModel):
 
 
 class PrintRequest(BaseModel):
-    fill: bool = False  # the same as write=["fill"]; kept for the first printable-quiz clients
+    # The first printable-quiz clients' field: the same as write=["fill"], except that with none left it
+    # answers 200 with fill_locked instead of a 402. A request with `write` is always the 402 kind.
+    fill: bool = False
     # Types to write now when they aren't cached: the guide had too few ready matching terms or
     # short-answer questions, or fill-in sentences are wanted. All of it is one AI quiz.
     write: List[Literal["fill", "matching", "short"]] = Field(default_factory=list, max_length=3)
@@ -732,6 +734,16 @@ _PRINT_WRITERS = {
 }
 
 
+def _can_write(user_id: str) -> bool:
+    """Whether the student has an AI quiz left. Only a count we could read and found at zero says no:
+    if the plan lookup hiccups the sheet still offers to write, and the write itself checks again."""
+    try:
+        return remaining(user_id, "ai_quiz") > 0
+    except Exception:
+        logger.warning("Could not read AI quiz allowance for print items", exc_info=True)
+        return True
+
+
 @router.post("/{guide_id}/print-items", dependencies=[Depends(ai_rate_limit())])
 def printable_items(guide_id: str, body: PrintRequest, authorization: str = Header(default="")):
     """Everything a printable quiz can use, per type, from the guide's own questions and answers.
@@ -752,13 +764,17 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
     cache = print_items.cached(row.get("print_items"), pairs)
     items = {"v": print_items.VERSION, "source": print_items.source_hash(pairs),
              "matching": print_items.matching(pairs), "short": print_items.short_answer(pairs)}
-    for _, (key, _writer) in _PRINT_WRITERS.items():
-        if key in cache:
+    for key, _writer in _PRINT_WRITERS.values():
+        if cache.get(key):  # a cached empty list is no result: the next print may try again
             items[key] = cache[key]
     wanted = set(body.write) | ({"fill"} if body.fill else set())
     candidates = {"fill": print_items.fill_candidates(pairs), "matching": print_items.matching_candidates(pairs),
                   "short": print_items.short_candidates(pairs)}
     to_write = [kind for kind in _PRINT_WRITERS if kind in wanted and _PRINT_WRITERS[kind][0] not in items and candidates[kind]]
+    fill_locked = False
+    if body.fill and not body.write and "fill" in to_write and not _can_write(user_id):
+        to_write.remove("fill")  # an old client asking only for fill-in sentences gets a 200 and fill_locked
+        fill_locked = True
     write_failed = []
     if to_write:
         require(user_id, "ai_quiz")  # a 402 with the plan's limit details, like a Quiz refresh, before any AI spend
@@ -767,7 +783,9 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
         for kind in to_write:
             key, writer = _PRINT_WRITERS[kind]
             written = writer(client, pairs)
-            if written is None:
+            if not written:
+                # The call failed (None) or nothing it wrote passed the checks ([]): nothing is saved,
+                # so the next print can try again, and nothing is charged for it.
                 write_failed.append(kind)
             else:
                 items[key] = written
@@ -783,6 +801,7 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
     if row.get("folder_id"):
         folder = supabase.table("folders").select("name").eq("id", row["folder_id"]).eq("user_id", user_id).execute().data or []
         class_name = (folder[0].get("name") if folder else "") or ""
+    can_write = _can_write(user_id)
     return {
         "title": row.get("title") or "",
         "class_name": class_name,
@@ -796,7 +815,10 @@ def printable_items(guide_id: str, body: PrintRequest, authorization: str = Head
         "matching_possible": 0 if "ai_matching" in items else len(candidates["matching"]),
         "short_possible": 0 if "ai_short" in items else len(candidates["short"]),
         # Whether a write would go ahead, so the sheet can say so before anything is requested.
-        "can_write": remaining(user_id, "ai_quiz") > 0,
+        "can_write": can_write,
+        # When it can't: the date the plan's AI quizzes come back, for the sheet's "Resets Dec 1".
+        "resets_at": None if can_write else next_reset(),
+        "fill_locked": fill_locked,
         "write_failed": write_failed,
     }
 

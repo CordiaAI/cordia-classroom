@@ -11,6 +11,10 @@
                    writes more from the same Q/A (checked like fill-in: nothing the question and
                    answer don't say; a short answer's key is always the stored answer)
 
+`pairs` is one list of the guide's Q/A in guide order. A pair marked {"hidden": True} (a question the
+guide's display hides) keeps its place, so every `source` index stays the guide's own, but it is never
+picked, written or counted as a candidate.
+
 Each item names its source question (`source`, the Q/A index) so one printout never asks the same
 idea twice. Matching, short answer and fill-in are cached on the guide (study_guides.print_items)
 under a hash of the Q/A they came from.
@@ -35,6 +39,26 @@ _STOP = {
 _EXPLAIN = re.compile(
     r"^\s*(why|how|describe|explain|compare|contrast|discuss|in what ways?|what (role|effect|impact|characterizes|are the (musical |main |key )?(characteristics|features|effects|causes)))\b",
     re.I)
+# Words that frame an explain-type question without stating a fact of their own ("Explain why X was
+# needed", "Give two reasons...", "In what ways did X affect Y?"), plus the openings the prompt allows.
+# A written question may use them although the stored question and answer don't; every other word it
+# adds has to come from them.
+_FRAME = {
+    "give", "gave", "reason", "way", "affect", "need", "role", "play", "explain", "describe", "compare",
+    "contrast", "discuss", "differ", "difference", "similar", "similarity", "important", "importance",
+    "significance", "main", "key", "major", "different", "example", "cause", "lead", "result", "happen",
+    "relate", "relationship", "contribute", "influence", "impact", "effect", "function",
+    "purpose", "mean", "meaning", "say", "briefly", "fully", "following", "given", "two", "three",
+    "can", "could", "would", "should", "may", "might", "will", "you", "your", "we", "our", "about", "after",
+    "before", "during", "if", "then", "while", "both", "between", "each", "any", "some", "more", "most",
+    "other", "such", "only", "very", "because", "using", "use", "so", "than", "over", "up",
+    "without", "whether", "within", "through", "across", "into", "make", "made", "change", "show", "help",
+    "become", "allow", "keep", "take", "get", "rather",
+}
+
+
+def _shown(pair: dict) -> bool:
+    return not pair.get("hidden")
 
 
 def source_hash(pairs: list) -> str:
@@ -47,7 +71,18 @@ def _tokens(text: str) -> list:
 
 
 def _stem(word: str) -> str:
-    return word[:5] if len(word) > 5 else word
+    """A word's first five letters once a plain ending is off, so "recursion" and "recursive",
+    "needed" and "needs", "cause" and "causes" each share one stem."""
+    for ending, shortest in (("ing", 7), ("ed", 6), ("es", 6), ("s", 5)):
+        if len(word) >= shortest and word.endswith(ending) and not word.endswith("ss"):
+            word = word[:-len(ending)]
+            break
+    if len(word) > 4 and word.endswith("e"):
+        word = word[:-1]
+    return word[:5]
+
+
+_FRAME_STEMS = {_stem(word) for word in _FRAME}
 
 
 def _content_stems(text: str) -> set:
@@ -57,6 +92,15 @@ def _content_stems(text: str) -> set:
 def _first_sentence(text: str) -> str:
     parts = re.split(r"(?<=[a-z0-9\)\"'”’])\.\s+(?=[A-Z])", str(text or "").strip(), maxsplit=1)
     return parts[0].strip().rstrip(".").strip()
+
+
+def _gives_away(term: str, definition: str) -> bool:
+    """The definition names its own term: the whole phrase, or at least half of the term's content
+    words in any form ("Recursion" in "A function that is recursive...")."""
+    if normalize(term) in normalize(definition):
+        return True
+    stems = _content_stems(term)
+    return bool(stems) and len(stems & _content_stems(definition)) >= (len(stems) + 1) // 2
 
 
 def _capitalize(text: str) -> str:
@@ -124,11 +168,13 @@ def multiple_choice(quiz: list, pairs: list) -> tuple:
         correct = question.get("correct_index")
         if not text or not answer or len(options) < 3 or not isinstance(correct, int):
             continue
+        source = index_of.get(normalize(text), f"quiz:{position}")
+        if isinstance(source, int) and not _shown(pairs[source]):
+            continue
         wrong = [option for i, option in enumerate(options) if i != correct]
         if keep_valid(wrong, text, answer, others)[1]:
             flagged += 1
             continue
-        source = index_of.get(normalize(text), f"quiz:{position}")
         items.append({"id": f"mc{position}", "source": source, "question": text,
                       "options": strip_stem(text, options), "answer": correct})
     return items, flagged
@@ -153,6 +199,8 @@ def matching(pairs: list) -> list:
     writes it, the definition the answer's first sentence without its "X is" / "It is" opening."""
     items, seen = [], set()
     for index, pair in enumerate(pairs):
+        if not _shown(pair):
+            continue
         term = (_defined_term(pair["question"]) or "").strip("'‘’\"")
         if not term or len(term.split()) > 4 or len(term) > 40:
             continue
@@ -161,7 +209,7 @@ def matching(pairs: list) -> list:
         if lead:
             definition = definition[lead.end():]
         definition = _capitalize(_plain(definition))
-        if len(definition.split()) < 3 or len(definition) > 130 or normalize(term) in normalize(definition):
+        if len(definition.split()) < 3 or len(definition) > 130 or _gives_away(term, definition):
             continue
         key = normalize(definition)
         if key in seen:
@@ -178,7 +226,7 @@ def short_answer(pairs: list) -> list:
     keyed with the stored answer."""
     items = []
     for index, pair in enumerate(pairs):
-        if _EXPLAIN.search(pair["question"]) and len(pair["answer"].split()) >= 8:
+        if _shown(pair) and _EXPLAIN.search(pair["question"]) and len(pair["answer"].split()) >= 8:
             items.append({"id": f"s{index}", "source": index, "question": pair["question"].strip(),
                           "key": pair["answer"].strip(), "points": SHORT_POINTS})
     return items
@@ -189,12 +237,27 @@ def short_answer(pairs: list) -> list:
 WRITE_LIMIT = 40
 
 
+_YES_NO = re.compile(r"^\s*(is|are|was|were|do|does|did|can|could|will|would|should|has|have|had|may|might)\b", re.I)
+
+
+def _may_give_term(pair: dict) -> bool:
+    """A pair likely to give a matching term, not just any answer: a question about one thing (not
+    yes/no, not two questions in one, not a long prompt) whose answer opens with a definition-sized
+    sentence that isn't itself a yes or no."""
+    question, answer = str(pair["question"]).strip(), str(pair["answer"]).strip()
+    first = _first_sentence(answer)
+    if not 3 <= len(first.split()) <= 30 or re.match(r"(?i)^(yes|no)\b", first):
+        return False
+    if _YES_NO.match(question) or question.count("?") > 1 or re.search(r",\s*(and|or)\b", question):
+        return False
+    return 1 <= len(_content_stems(question)) <= 6
+
+
 def matching_candidates(pairs: list, limit: int = WRITE_LIMIT) -> list:
     """Q/A indexes Haiku can turn into a matching term: an answer whose first sentence defines
     something, not already a ready matching item."""
     ready = {item["source"] for item in matching(pairs)}
-    fits = [index for index, pair in enumerate(pairs)
-            if index not in ready and 3 <= len(_first_sentence(pair["answer"]).split()) <= 30]
+    fits = [index for index, pair in enumerate(pairs) if index not in ready and _shown(pair) and _may_give_term(pair)]
     return fits[:limit]
 
 
@@ -202,7 +265,7 @@ def short_candidates(pairs: list, limit: int = WRITE_LIMIT) -> list:
     """Q/A indexes Haiku can turn into a short-answer question: an answer long enough to explain,
     not already a ready short-answer item."""
     ready = {item["source"] for item in short_answer(pairs)}
-    fits = [index for index, pair in enumerate(pairs) if index not in ready and len(pair["answer"].split()) >= 8]
+    fits = [index for index, pair in enumerate(pairs) if index not in ready and _shown(pair) and len(pair["answer"].split()) >= 8]
     return fits[:limit]
 
 
@@ -246,7 +309,7 @@ def check_matching(term: str, definition: str, question: str, answer: str) -> Op
         return None
     if not 3 <= len(definition.split()) <= 20 or len(definition) > 130:
         return None
-    if normalize(term) in normalize(definition):
+    if _gives_away(term, definition):
         return None
     allowed = _content_stems(question) | _content_stems(answer)
     if _content_stems(term) - allowed or _content_stems(definition) - allowed:
@@ -285,9 +348,12 @@ def check_short(text: str, question: str, answer: str) -> Optional[str]:
     """A short-answer question, or None when it isn't an explain-type question, runs long, or names
     anything the stored question and answer don't contain."""
     text = " ".join(str(text or "").split())
-    if not text or len(text) > 220 or not _EXPLAIN.search(text):
+    opening = _EXPLAIN.search(text)
+    if not text or len(text) > 220 or not opening:
         return None
-    if _content_stems(text) - (_content_stems(question) | _content_stems(answer)):
+    # Only the words after the opening can add a fact; question-framing words ("give", "affect",
+    # "needed", "role") and the opening's own words don't.
+    if _content_stems(text[opening.end():]) - _FRAME_STEMS - (_content_stems(question) | _content_stems(answer)):
         return None
     return text
 
@@ -324,7 +390,7 @@ def fill_candidates(pairs: list, limit: int = 40) -> list:
     but short enough for one sentence. Ideas matching and short answer can't use come first, so a
     mixed printout covers more of the guide."""
     used = {item["source"] for item in matching(pairs) + short_answer(pairs)}
-    fits = [index for index, pair in enumerate(pairs) if 1 <= len(pair["answer"].split()) <= 35]
+    fits = [index for index, pair in enumerate(pairs) if _shown(pair) and 1 <= len(pair["answer"].split()) <= 35]
     ordered = [index for index in fits if index not in used] + [index for index in fits if index in used]
     return sorted(ordered[:limit])
 
