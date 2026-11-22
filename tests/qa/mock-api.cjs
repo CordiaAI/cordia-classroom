@@ -431,9 +431,47 @@ async function install(context, state) {
     if (path === '/billing/status') return json({ plan: 'free', features: { guide: { used: 1, limit: 3 }, tutor: { used: 2, limit: 10 }, learn_my_way: { used: 0, limit: 5 }, retain_types: { remaining: 1 } }, trial_available: true });
     if (path === '/learning-style') return json({ enabled: false, style: null });
     if (path === '/explanation-preference') return json({ text: '' });
+    // Discover (backend routers/discover.py). state.discover = { guides, classmates, classrooms, people,
+    // delay (ms), fail (true | 'guides' | 'classrooms' | 'people', answers 500) }. A search or filter matches
+    // on the title; ?from_my_classrooms=true answers with state.discover.classmates.
+    if (path.startsWith('/discover/') && state.discover) {
+      const d = state.discover;
+      if (d.delay) await new Promise(resolve => setTimeout(resolve, d.delay));
+      const kind = path.slice('/discover/'.length);
+      if (d.fail === true || d.fail === kind) return route.fulfill({ status: 500, json: { detail: 'Internal Server Error' } });
+      const q = (url.searchParams.get('q') || '').toLowerCase();
+      if (kind === 'guides') {
+        const narrowed = ['school', 'course', 'term', 'creator_type', 'size', 'updated_within'].some(name => url.searchParams.get(name));
+        const source = url.searchParams.get('from_my_classrooms') === 'true' ? (d.classmates || []) : (d.guides || []);
+        const found = narrowed ? [] : source.filter(g => !q || g.title.toLowerCase().includes(q));
+        const limit = Number(url.searchParams.get('limit')) || 20;
+        return json({ guides: found.slice(0, limit), total: found.length, facets: { schools: [{ id: 's1', name: 'Riverside State University', count: 4 }], courses: [{ id: 'c1', name: 'BIO 201', count: 2 }], terms: [{ name: 'Fall 2026', count: 3 }] } });
+      }
+      if (kind === 'classrooms') return json({ classrooms: (d.classrooms || []).filter(r => !q || r.name.toLowerCase().includes(q)) });
+      if (kind === 'people') return json({ people: (d.people || []).filter(person => person.display_name.toLowerCase().includes(q)) });
+    }
     if (path === '/search') return json({ results: state.guides.filter(g => g.title.toLowerCase().includes((url.searchParams.get('q') || '').toLowerCase())).map(g => ({ id: g.id, title: g.title })) });
     return json({});
   });
 }
 
-module.exports = { install, createState, TOKEN, USER, otherTab };
+// Sample public sets for Discover checks: real-sounding class work, authors with and without a name.
+function sampleDiscover() {
+  const set = (n, title, extra = {}) => ({ id: `e0000000-0000-4000-8000-0000000000${String(n).padStart(2, '0')}`, title, question_count: 24, outline: ['The big ideas, in the order the lecture covers them.'],
+    studied_by: 0, author: { username: 'maya.okafor', display_name: 'Maya Okafor', initials: 'MO' }, verified: false, course: null, term: '', similar: [], ...extra });
+  const guides = [
+    set(1, 'Cellular respiration: glycolysis to the electron transport chain', { studied_by: 41, question_count: 38, course: { id: 'c1', code: 'BIO 201', school: 'Riverside State University' }, term: 'Fall 2026', similar: [{ id: 'e0000000-0000-4000-8000-000000000091', title: 'Cellular respiration quick review' }] }),
+    set(2, 'Due process and equal protection: the cases that matter', { studied_by: 27, question_count: 52, verified: true, author: { username: 'prof.alvarez', display_name: 'Dr. Elena Alvarez', initials: 'EA', verified: true }, course: { id: 'c2', code: 'POL 310', school: 'Riverside State University' }, term: 'Fall 2026' }),
+    set(3, 'Loops, functions and recursion in Python', { studied_by: 19, question_count: 31, author: null }),
+    set(4, 'Florence and Rome: Renaissance art from Giotto to Raphael', { studied_by: 12, question_count: 44, author: { display_name: 'A classmate', initials: 'C' } }),
+    set(5, 'Autonomic pharmacology: receptors and drug classes', { studied_by: 9, question_count: 63, course: { id: 'c3', code: 'NUR 240', school: 'Lakeshore College' }, term: 'Spring 2026' }),
+  ];
+  return {
+    guides,
+    classmates: [guides[0], set(6, 'Statistics: confidence intervals and hypothesis tests', { studied_by: 6, question_count: 29, author: { username: 'dev.patel', display_name: 'Dev Patel', initials: 'DP' }, course: { id: 'c4', code: 'MAT 150', school: 'Riverside State University' }, term: 'Fall 2026' })],
+    classrooms: [{ id: 'r0000000-0000-4000-8000-000000000001', name: 'BIO 201 study group', kind: 'study_group', course: 'BIO 201', member_count: 14, join_policy: 'open', my_status: null, owner: { username: 'maya.okafor', display_name: 'Maya Okafor', initials: 'MO' } }],
+    people: [{ username: 'maya.okafor', display_name: 'Maya Okafor', initials: 'MO', school: 'Riverside State University' }],
+  };
+}
+
+module.exports = { install, createState, TOKEN, USER, otherTab, sampleDiscover };
