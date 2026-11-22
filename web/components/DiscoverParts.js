@@ -11,7 +11,7 @@ import { studiedBy } from '../lib/discover.mjs';
 const SHOW_MARK_AFTER = 200; // never flash the mark for a quick answer (DESIGN-SPEC 6.1)
 
 // The page is waiting for data. Fixed height, so nothing jumps when the list arrives; the breathing
-// Cordia mark appears only if the wait passes 200ms. No skeletons, no spinners.
+// Cordia mark appears only if the wait passes 200ms, and nothing else ever stands in for the data.
 export function DiscoverLoading({ label = 'Loading' }) {
   const [shown, setShown] = useState(false);
   useEffect(() => {

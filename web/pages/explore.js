@@ -208,6 +208,7 @@ function GuidesPanel({ q, filters, onFilter, onClear }) {
         .exg-filters { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; align-items: center; }
         .exg-check { display: flex; align-items: center; gap: 10px; min-height: 44px; color: var(--ink); cursor: pointer; }
         .exg-check input { width: 18px; height: 18px; accent-color: var(--olive); flex: none; }
+        @media (max-width: 640px) { .exg-check { grid-column: 1 / -1; } }
         .exg-heading { margin: 8px 0 -6px; color: var(--ink); font: 600 var(--fs-15)/1.3 var(--font-sans); }
         .exg-list { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
         .exg-more { justify-self: center; }
