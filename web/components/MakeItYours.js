@@ -2,13 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { Pipette, X } from 'lucide-react';
 import BodyPortal from './BodyPortal';
 import SegmentedControl from './SegmentedControl';
+import Toggle from './Toggle';
 import { defaultLook, lookSettings, saveLook } from '../lib/theme';
 import { cssVar } from '../lib/cssVar';
 import { ACCENTS, BACKGROUNDS, FONTS, SIZES, applyPreset, validateSettings, withCustomAccent } from '../lib/themeSettings.mjs';
 import {
   ACCENT_NAMES, APPEARANCE_NAMES, BACKGROUND_NAMES, FONT_NAMES, GLASS_CHOICES, GLASS_NAMES, MAKE_IT_YOURS_EVENT, SIZE_NAMES, UNDO_MS,
-  customAccentAdjusted, pickGlass, sameSettings, shownGlass, themeTiles,
+  SKY_HINTS, customAccentAdjusted, pickGlass, sameSettings, shownGlass, themeTiles,
 } from '../lib/makeItYours.mjs';
+import { skyBlockedBy } from '../lib/skyTime.mjs';
 
 const OPEN_MS = 260;
 const CLOSE_MS = 200;
@@ -17,6 +19,9 @@ const FOCUSABLE = 'button:not([disabled]), [href], input:not([disabled]), select
 
 function matches(query) {
   try { return typeof window !== 'undefined' && Boolean(window.matchMedia) && window.matchMedia(query).matches; } catch { return false; }
+}
+function canFrost() {
+  try { return typeof CSS === 'undefined' || !CSS.supports || CSS.supports('backdrop-filter', 'blur(1px)') || CSS.supports('-webkit-backdrop-filter', 'blur(1px)'); } catch { return true; }
 }
 
 // The host: mounted once in the signed-in Layout (both shells, every width), so the sheet opens from the
@@ -126,6 +131,7 @@ function onRadioKeys(event, setKeyed) {
 function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
   const [settings, setSettings] = useState(() => lookSettings());
   const [reduceGlass] = useState(() => matches(REDUCED_TRANSPARENCY));
+  const [frosts] = useState(canFrost);
   const [keyed, setKeyed] = useState(false);
   const sheetRef = useRef(null);
   const resetRef = useRef(null);
@@ -171,6 +177,8 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
   const atDefault = sameSettings(settings, defaultLook());
   const adjusted = customAccentAdjusted(settings);
   const glass = shownGlass(settings, reduceGlass);
+  // "Sky follows the time" works only on Clouds with see-through glass; anywhere else the switch says why it is off.
+  const skyBlocked = skyBlockedBy(settings, { reducedTransparency: reduceGlass, canFrost: frosts });
   const swatchAccent = accent => (accent === 'custom' ? settings.customAccent : `var(--swatch-accent-${accent})`);
 
   // The colour picker fires on every move; apply once per frame.
@@ -273,13 +281,19 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
 
             <div className="miy-row" role="group" aria-labelledby="miy-l-bg">
               <div className="miy-label"><span id="miy-l-bg">Background</span></div>
-              <div className="miy-tiles" role="radiogroup" aria-labelledby="miy-l-bg" onKeyDown={event => onRadioKeys(event, setKeyed)}>
-                {BACKGROUNDS.map(bg => (
-                  <button key={bg} className="miy-tile miy-small" {...radioProps(settings.bg === bg, () => commit({ ...settings, bg }))}>
-                    <span className="miy-art miy-art-bg" style={{ background: `var(--swatch-bg-${bg})` }} aria-hidden="true" />
-                    <span className="miy-name">{BACKGROUND_NAMES[bg]}</span>
-                  </button>
-                ))}
+              <div className="miy-controls miy-bg-controls">
+                <div className="miy-tiles" role="radiogroup" aria-labelledby="miy-l-bg" onKeyDown={event => onRadioKeys(event, setKeyed)}>
+                  {BACKGROUNDS.map(bg => (
+                    <button key={bg} className="miy-tile miy-small" {...radioProps(settings.bg === bg, () => commit({ ...settings, bg }))}>
+                      <span className="miy-art miy-art-bg" style={{ background: `var(--swatch-bg-${bg})` }} aria-hidden="true" />
+                      <span className="miy-name">{BACKGROUND_NAMES[bg]}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className={'miy-sky' + (skyBlocked ? ' is-off' : '')}>
+                  <Toggle label="Sky follows the time" description={SKY_HINTS[skyBlocked || 'on']}
+                    checked={settings.skyTime && !skyBlocked} disabled={Boolean(skyBlocked)} onChange={on => commit({ ...settings, skyTime: on })} />
+                </div>
               </div>
             </div>
 
@@ -423,6 +437,13 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         .miy-tile:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 7px; }
         .miy-dot:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 0; }
         .miy-sheet.is-keyed :is(.miy-tile, .miy-dot-fill) { transition: none; }
+
+        /* Sky follows the time: a switch row under the background tiles. While it can't apply, only the switch dims;
+           the line saying why stays at full contrast. */
+        .miy-bg-controls { gap: 10px; }
+        .miy-sky { max-width: 452px; }
+        .miy-sky .c-toggle.is-disabled { opacity: 1; cursor: default; }
+        .miy-sky .c-toggle.is-disabled .c-toggle-track { opacity: .5; }
 
         .miy-row > .miy-seg { justify-self: start; max-width: 100%; }
         .miy-seg.is-locked { opacity: .6; }

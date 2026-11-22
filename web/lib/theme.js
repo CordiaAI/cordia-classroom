@@ -4,6 +4,7 @@ import { getUserId } from './api';
 import { accountCreatedAt, getProgress, progressLoaded, progressRead, updateProgress } from './progress';
 import { DEFAULT_SETTINGS, accountSettings, applySettings, bootCache, defaultAppearance, defaultSettingsFor, resolveAppearance } from './themeSettings.mjs';
 import { KEEPS_SIZE, LOOK_KEY, lookKeyFor } from './themeBoot.mjs';
+import { SKY_FADE_MS, skyFor, skyPeriod } from './skyTime.mjs';
 
 // The look: light/dark and every "Make it yours" setting (lib/themeSettings.mjs). The account is the
 // one source of truth (progress.look, saved in Supabase user metadata next to the old progress.theme,
@@ -12,10 +13,23 @@ import { KEEPS_SIZE, LOOK_KEY, lookKeyFor } from './themeBoot.mjs';
 // Public pages stay the Cordia default in light whatever is saved (the student's text size stays on /pricing).
 const KEY = 'theme'; // the old light/dark choice, still written so older tabs and devices agree
 const DEVICE_DARK = '(prefers-color-scheme: dark)';
+const LESS_TRANSPARENCY = '(prefers-reduced-transparency: reduce)';
+const LESS_MOTION = '(prefers-reduced-motion: reduce)';
 export const LIGHT_ONLY = ['/', '/login', '/signup', '/pricing', '/reset-password'];
 
+function deviceMatches(query) {
+  try { return typeof window !== 'undefined' && Boolean(window.matchMedia) && window.matchMedia(query).matches; } catch { return false; }
+}
 function deviceIsDark() {
-  try { return typeof window !== 'undefined' && Boolean(window.matchMedia) && window.matchMedia(DEVICE_DARK).matches; } catch { return false; }
+  return deviceMatches(DEVICE_DARK);
+}
+// Glass is solid on a browser that can't frost, so the sky stays put there too (lib/skyTime.mjs skyActive).
+function deviceCanFrost() {
+  try { return typeof CSS === 'undefined' || !CSS.supports || CSS.supports('backdrop-filter', 'blur(1px)') || CSS.supports('-webkit-backdrop-filter', 'blur(1px)'); } catch { return true; }
+}
+// The time-of-day sky to draw for these settings now (null when it does not follow the time).
+function skyNow(settings) {
+  return skyFor(settings, { period: skyPeriod(new Date()), reducedTransparency: deviceMatches(LESS_TRANSPARENCY), canFrost: deviceCanFrost() });
 }
 
 // The device cache is one small value per account, under "cordiaLook:<user id>" (lib/themeBoot.mjs): the id is
@@ -112,18 +126,54 @@ export function isLightOnly(pathname) {
 
 let lastPath = '/';
 let watching = false;
-// Match device follows the device while the app is open.
+// Match device follows the device while the app is open, and the sky stops following the time as soon as the
+// device asks for less transparency.
 function watchDevice() {
   if (watching || typeof window === 'undefined' || !window.matchMedia) return;
   watching = true;
-  try { window.matchMedia(DEVICE_DARK).addEventListener('change', () => applyTheme(lastPath)); } catch { /* no change events */ }
+  for (const query of [DEVICE_DARK, LESS_TRANSPARENCY]) {
+    try { window.matchMedia(query).addEventListener('change', () => applyTheme(lastPath)); } catch { /* no change events */ }
+  }
 }
 
 export function applyTheme(pathname = typeof window !== 'undefined' ? window.location.pathname : '/') {
   if (typeof document === 'undefined') return;
   lastPath = pathname;
-  applySettings(lookSettings(), { deviceIsDark: deviceIsDark(), publicPage: isLightOnly(pathname), keepSize: KEEPS_SIZE.includes(pathname) });
+  const settings = lookSettings();
+  applySettings(settings, { deviceIsDark: deviceIsDark(), publicPage: isLightOnly(pathname), keepSize: KEEPS_SIZE.includes(pathname), sky: skyNow(settings) });
   watchDevice();
+  watchSky();
+}
+
+// The sky follows the device's clock while the page is open. Once a minute, and whenever the page comes back into
+// view, it checks the period; when it has moved on, the new sky crossfades in over SKY_FADE_MS (styles/tokens.css,
+// <html data-sky-fade>), at most once per period, and at once under reduced motion. While it fades, data-sky-from
+// keeps the period it left, so the glass it needed stays until the old sky has gone (tokens.css, the night glass).
+// Every other change (a pick in Make it yours, first paint, a new page) is instant.
+let skyWatching = false;
+let fadeTimer = 0;
+let lastFade = null;
+function checkSky() {
+  if (typeof document === 'undefined' || document.hidden) return;
+  const root = document.documentElement;
+  const shown = root.getAttribute('data-sky');
+  const next = isLightOnly(lastPath) ? null : skyNow(lookSettings());
+  if (!shown || !next || shown === next) return;
+  if (lastFade !== next && !deviceMatches(LESS_MOTION)) {
+    lastFade = next;
+    clearTimeout(fadeTimer);
+    root.setAttribute('data-sky-from', shown);
+    root.setAttribute('data-sky-fade', '');
+    fadeTimer = setTimeout(() => { root.removeAttribute('data-sky-fade'); root.removeAttribute('data-sky-from'); }, SKY_FADE_MS + 100);
+  }
+  holdTransitions(); // a Match device page may turn dark with the night: every colour swaps at once
+  applyTheme(lastPath);
+}
+function watchSky() {
+  if (skyWatching || typeof window === 'undefined' || typeof document.addEventListener !== 'function') return;
+  skyWatching = true;
+  setInterval(checkSky, 60000);
+  document.addEventListener('visibilitychange', checkSky);
 }
 
 // A look change swaps every colour at once: for two frames nothing on the page transitions, so parts with

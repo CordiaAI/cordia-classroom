@@ -33,7 +33,16 @@ export function bootScript(lightSignedOut) {
     // gets Match device written into the cache as soon as the account is known, so only then does this follow
     // the device: with no cache and no account yet, an existing student never flashes dark.
     + "var ap=c&&c.ap;if(ap!=='light'&&ap!=='dark'&&ap!=='system'){var t=other?null:ls.getItem('theme');ap=t==='dark'||t==='light'?t:'light'}"
-    + "var dark=!light&&(ap==='dark'||(ap==='system'&&!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches));"
+    // The time-of-day sky (lib/skyTime.mjs, the same hours as skyPeriod): only off a public page, only when the saved
+    // settings allow it (`k`; a cache from before it existed is read from its settings; with no cache it is the
+    // default, on), and not when the device asks for less transparency or cannot frost. Set here, before first paint,
+    // so the right sky is the first one drawn; at night it turns a Match device page dark.
+    + "var sky=null,s=c&&c.s||{};"
+    + "var k=c?(typeof c.k==='number'?c.k===1:(s.bg||'clouds')==='clouds'&&(s.look||'none')==='none'&&s.glass!=='solid'&&s.skyTime!==false):true;"
+    + "if(!light&&k){var rt=!!window.matchMedia&&matchMedia('(prefers-reduced-transparency: reduce)').matches;"
+    + "var fr=!window.CSS||!CSS.supports||CSS.supports('backdrop-filter','blur(1px)')||CSS.supports('-webkit-backdrop-filter','blur(1px)');"
+    + "if(!rt&&fr){var h=new Date().getHours();sky=h>=20||h<6?'night':h>=17?'evening':h>=11?'day':'morning';d.setAttribute('data-sky',sky)}}"
+    + "var dark=!light&&(ap==='dark'||(ap==='system'&&(sky==='night'||!!window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches)));"
     + "d.setAttribute('data-theme',dark?'dark':'light');"
     // A public page that keeps the student's text size.
     + "if(light&&c&&" + JSON.stringify(KEEPS_SIZE) + ".indexOf(p)>-1&&c.a&&/^[a-z]+$/.test(c.a['data-size']||''))d.setAttribute('data-size',c.a['data-size']);"

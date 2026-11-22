@@ -50,6 +50,14 @@ export const SIZE_NAMES = { small: 'Small', default: 'Default', large: 'Large', 
 export const APPEARANCE_NAMES = { light: 'Light', dark: 'Dark', system: 'Match device' };
 export const GLASS_CHOICES = ['frosted', 'clearer', 'solid'];
 export const GLASS_NAMES = { frosted: 'Frosted', clearer: 'Clearer', solid: 'Solid' };
+// The line under "Sky follows the time": what it does, or why it is off right now (lib/skyTime.mjs skyBlockedBy).
+export const SKY_HINTS = {
+  on: 'Morning, day, evening and night, from this device\'s clock.',
+  background: 'Only on the Clouds background.',
+  solid: 'Off while glass is solid.',
+  transparency: 'Off while this device reduces transparency.',
+  look: 'Paper & Clay is always plain paper.',
+};
 
 // The Glass segment shown as chosen: 'auto' is Frosted, or Solid when the device asks for less transparency;
 // a look is always Solid.

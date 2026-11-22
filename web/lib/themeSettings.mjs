@@ -3,6 +3,7 @@
 // styles/tokens.css; this file only picks which attributes (and, for a custom accent, which runtime
 // variables) are on <html>.
 import { ACCENT_VARIABLES, accentVariables, deriveAccent, parseHex, toHex } from './accentMath.mjs';
+import { SKY_PERIODS, nightIsDark, skyAllowed } from './skyTime.mjs';
 
 export const ACCENTS = ['olive', 'ocean', 'indigo', 'clay', 'rose', 'plum', 'graphite', 'teal'];
 export const BACKGROUNDS = ['clouds', 'dusk', 'paper', 'meadow'];
@@ -66,6 +67,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   appearance: LEGACY_APPEARANCE, // what no saved choice means for an existing account; defaultAppearance() decides for a new one
   glass: 'auto',
   look: 'none',
+  skyTime: true, // "Sky follows the time" (lib/skyTime.mjs): on by default, and only ever drawn on Clouds
 });
 
 // The attribute each setting writes on <html>, and the value that means "default, no attribute".
@@ -94,6 +96,7 @@ export function validateSettings(raw) {
     settings.size = pick(input.size, SIZES, DEFAULT_SETTINGS.size);
     settings.appearance = pick(input.appearance, APPEARANCES, DEFAULT_SETTINGS.appearance);
     settings.glass = pick(input.glass, GLASS_LEVELS, DEFAULT_SETTINGS.glass);
+    settings.skyTime = input.skyTime !== false; // only an explicit "off" turns it off: a look saved before it existed keeps the default
     if (input.accent === LOOK_ACCENT) {
       if (settings.look === 'paper-clay') settings.accent = LOOK_ACCENT; // anywhere else it would sit on glass it was not made for
     } else if (input.accent === 'custom') {
@@ -221,24 +224,28 @@ export function customAccentVariables(settings) {
 }
 
 // What the first-paint script needs, so it can apply the saved look with no maths: the attributes
-// that are set, the appearance, the custom accent's variables and the font files to preload.
+// that are set, the appearance, the custom accent's variables, the font files to preload, and whether the saved
+// settings let the sky follow the time (`k`, 1 or 0; the script still asks the device and the clock).
 export function bootCache(settings) {
   const clean = validateSettings(settings);
   const attributes = {};
   for (const [attribute, value] of Object.entries(attributesFor(clean))) if (value) attributes[attribute] = value;
-  return { s: clean, a: attributes, ap: clean.appearance, v: customAccentVariables(clean), f: FONT_FILES[clean.font] || [] };
+  return { s: clean, a: attributes, ap: clean.appearance, v: customAccentVariables(clean), f: FONT_FILES[clean.font] || [], k: skyAllowed(clean) ? 1 : 0 };
 }
 
 // Puts a look on <html>: sets or removes the data attributes, writes (or clears) the custom accent's
 // variables, and sets data-theme from the appearance. `publicPage` pages are always the Cordia
-// default in light, whatever was saved. Returns what it applied.
-export function applySettings(settings, { root, deviceIsDark = false, publicPage = false, keepSize = false } = {}) {
+// default in light, whatever was saved. `sky` is the time-of-day period to draw (lib/skyTime.mjs skyFor, null when
+// the sky does not follow the time): it becomes data-sky, and at night it turns a Match device page dark.
+// Returns what it applied.
+export function applySettings(settings, { root, deviceIsDark = false, publicPage = false, keepSize = false, sky = null } = {}) {
   const target = root || (typeof document !== 'undefined' ? document.documentElement : null);
   // A public page keeps the student's text size when it is asked to (`keepSize`): that is for reading, not looks.
   const clean = publicPage ? { ...DEFAULT_SETTINGS, appearance: 'light', ...(keepSize ? { size: validateSettings(settings).size } : {}) } : validateSettings(settings);
   const attributes = attributesFor(clean);
   const variables = customAccentVariables(clean);
-  const theme = resolveAppearance(clean.appearance, deviceIsDark);
+  const period = !publicPage && skyAllowed(clean) && SKY_PERIODS.includes(sky) ? sky : null;
+  const theme = resolveAppearance(clean.appearance, deviceIsDark || nightIsDark(clean.appearance, period));
   if (target) {
     for (const [attribute, value] of Object.entries(attributes)) {
       if (value) { if (target.getAttribute(attribute) !== value) target.setAttribute(attribute, value); } else target.removeAttribute(attribute);
@@ -246,7 +253,8 @@ export function applySettings(settings, { root, deviceIsDark = false, publicPage
     for (const name of ACCENT_VARIABLES) {
       if (variables[name]) target.style.setProperty(name, variables[name]); else target.style.removeProperty(name);
     }
+    if (period) { if (target.getAttribute('data-sky') !== period) target.setAttribute('data-sky', period); } else target.removeAttribute('data-sky');
     if (target.getAttribute('data-theme') !== theme) target.setAttribute('data-theme', theme);
   }
-  return { settings: clean, attributes, variables, theme };
+  return { settings: clean, attributes, variables, theme, sky: period };
 }
