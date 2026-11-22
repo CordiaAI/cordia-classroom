@@ -8,8 +8,11 @@
 // own. A cache written before that (one shared "cordiaLook") is read once for the account that has none yet,
 // unless it names another account; lib/theme.js moves it to the account's own key and removes it.
 //
-// Public pages stay the Cordia default in light whatever was saved: the same list that keeps them
-// light today decides it. Pricing is light and default for everyone, signed in or not (lib/theme.js LIGHT_ONLY).
+// Public pages stay the Cordia default in light whatever was saved: LIGHT_ONLY and LIGHT_SIGNED_OUT below decide
+// it, here and in lib/theme.js alike. Pricing is light and default for everyone, signed in or not.
+import { USE_CASES, useCasePath } from './useCases/index.mjs';
+import { COMPARISONS, comparisonPath } from './comparisons/index.mjs';
+
 export const LOOK_KEY = 'cordiaLook';
 // Public pages that still use the student's own text size (it is for reading, not looks): the Cordia default in
 // light in every other way.
@@ -17,10 +20,20 @@ export const KEEPS_SIZE = ['/pricing'];
 // The device cache of one account ('' when nobody is signed in).
 export const lookKeyFor = id => (id ? LOOK_KEY + ':' + id : '');
 
-export function bootScript(lightSignedOut) {
+// Pages that are always the Cordia default in light, signed in or not.
+export const LIGHT_ONLY = ['/', '/login', '/signup', '/pricing', '/reset-password'];
+// Public reading pages that are the Cordia default in light for a signed-out visitor and follow the account's look
+// when signed in, plus every guide under /guides/ (GUIDES_PREFIX, which also covers the /guides/[slug] route pattern
+// lib/theme.js is given). The one list both the first-paint script and lib/theme.js read, so a page can never get
+// the student's look (or the sky) from one and the default from the other.
+export const LIGHT_SIGNED_OUT = ['/privacy', '/terms', '/honor-code', '/mission', '/instructors', '/copyright', '/connect/claude', '/guides', ...USE_CASES.map(useCasePath), ...COMPARISONS.map(comparisonPath)];
+export const GUIDES_PREFIX = '/guides/';
+export const lightWhenSignedOut = path => LIGHT_SIGNED_OUT.includes(path) || path.startsWith(GUIDES_PREFIX);
+
+export function bootScript(lightSignedOut = LIGHT_SIGNED_OUT) {
   return '(function(){try{'
     + 'var d=document.documentElement,ls=localStorage,p=location.pathname;'
-    + "var light=['/','/login','/signup','/pricing','/reset-password'].indexOf(p)>-1||((" + JSON.stringify(lightSignedOut) + ".indexOf(p)>-1||p.indexOf('/guides/')===0)&&!ls.getItem('authToken'));"
+    + 'var light=' + JSON.stringify(LIGHT_ONLY) + ".indexOf(p)>-1||((" + JSON.stringify(lightSignedOut) + ".indexOf(p)>-1||p.indexOf('" + GUIDES_PREFIX + "')===0)&&!ls.getItem('authToken'));"
     + "var me=ls.getItem('userId')||'',c=null,other=false;"
     // Another account's look on this browser: its own key, or the shared cache from before the keys when that names
     // another account. It is never painted, and it makes the old light/dark key (shared too) untrusted, so the next

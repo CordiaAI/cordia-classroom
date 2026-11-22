@@ -4,6 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -156,10 +157,10 @@ async function load(file, deps) {
   return new Function('__deps', `${source}\nreturn { ${names.join(', ')} };`)(deps);
 }
 
-async function page({ reducedMotion = false, look = DEFAULT_SETTINGS } = {}) {
-  const root = fakeRoot();
+async function page({ reducedMotion = false, look = DEFAULT_SETTINGS, root = fakeRoot(), signedIn = true } = {}) {
   const listeners = {};
-  const store = new Map([['userId', 'me'], ['authToken', 'x'], [bootModule.lookKeyFor('me'), JSON.stringify(bootCache(look))]]);
+  const store = new Map([['userId', 'me'], [bootModule.lookKeyFor('me'), JSON.stringify(bootCache(look))]]);
+  if (signedIn) store.set('authToken', 'x');
   globalThis.localStorage = {
     getItem: key => (store.has(key) ? store.get(key) : null), setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key),
     get length() { return store.size; }, key: index => [...store.keys()][index] ?? null,
@@ -185,7 +186,7 @@ test('a period change crossfades over 3 seconds, once, and keeps the period it l
   theme.applyTheme('/library');
   assert.equal(root.getAttribute('data-sky'), 'day');
   assert.equal(root.getAttribute('data-sky-fade'), null, 'first paint and every pick are instant');
-  t.mock.timers.tick(60000); // 17:00:30
+  t.mock.timers.tick(31000); // 17:00:01, just after the timer to the next period fired
   assert.equal(root.getAttribute('data-sky'), 'evening');
   assert.equal(root.getAttribute('data-sky-fade'), '', 'the evening sky fades in');
   assert.equal(root.getAttribute('data-sky-from'), 'day');
@@ -217,10 +218,140 @@ test('a page coming back into view catches up with the clock; with the sky off n
   t.mock.timers.setTime(new Date(2026, 10, 18, 21, 0, 0).getTime());
   listeners.visibilitychange();
   assert.equal(root.getAttribute('data-sky'), 'night');
-  assert.equal(root.getAttribute('data-theme'), 'dark', 'Match device follows the night');
+  assert.equal(root.getAttribute('data-theme'), 'light', 'the theme waits for the next page load');
   theme.saveLook({ ...DEFAULT_SETTINGS, appearance: 'system', glass: 'solid' });
   assert.equal(root.getAttribute('data-sky'), null, 'Solid glass turns it off at once');
-  assert.equal(root.getAttribute('data-theme'), 'light', 'and Match device follows the device alone again');
+  assert.equal(root.getAttribute('data-theme'), 'light', 'and Match device follows the device alone');
+});
+
+// ---------- The clock never flips light and dark while a page is open ----------
+
+test('Match device on a light device: crossing 20:00 with the page open fades the sky and keeps the theme; a reload after 20:00 is dark', async t => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: new Date(2026, 10, 18, 19, 59, 0).getTime() });
+  const look = { ...DEFAULT_SETTINGS, appearance: 'system' };
+  const { root, theme } = await page({ look });
+  theme.applyTheme('/library');
+  assert.deepEqual([root.getAttribute('data-sky'), root.getAttribute('data-theme')], ['evening', 'light']);
+  t.mock.timers.tick(61000); // 20:00:01
+  assert.equal(root.getAttribute('data-sky'), 'night');
+  assert.equal(root.getAttribute('data-sky-fade'), '', 'the night sky fades in over 3 seconds');
+  assert.equal(root.getAttribute('data-theme'), 'light', 'and the app stays light while the page is open');
+  t.mock.timers.tick(SKY_FADE_MS + 100);
+  assert.equal(root.getAttribute('data-theme'), 'light');
+  theme.applyTheme('/home'); // a new page in the same tab is not a page load
+  assert.equal(root.getAttribute('data-theme'), 'light');
+  // The reload: the first-paint script, then a fresh theme.js on the same <html>.
+  const reloaded = fakeRoot();
+  const sandbox = {
+    document: { documentElement: reloaded, head: { appendChild() {} }, createElement: () => ({}) },
+    location: { pathname: '/library' },
+    localStorage: globalThis.localStorage,
+    window: { matchMedia: () => ({ matches: false }) }, matchMedia: () => ({ matches: false }),
+    Date,
+  };
+  vm.runInNewContext(bootModule.bootScript(), sandbox);
+  assert.deepEqual([reloaded.getAttribute('data-sky'), reloaded.getAttribute('data-theme')], ['night', 'dark'], 'first paint after 20:00');
+  const after = await page({ look, root: reloaded });
+  after.theme.applyTheme('/library');
+  assert.deepEqual([reloaded.getAttribute('data-sky'), reloaded.getAttribute('data-theme')], ['night', 'dark'], 'and theme.js agrees');
+});
+
+test('a Match device page that loaded at night stays dark through 06:00 while it is open', async t => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: new Date(2026, 10, 18, 5, 59, 0).getTime() });
+  const { root, theme } = await page({ look: { ...DEFAULT_SETTINGS, appearance: 'system' } });
+  theme.applyTheme('/library');
+  assert.deepEqual([root.getAttribute('data-sky'), root.getAttribute('data-theme')], ['night', 'dark']);
+  t.mock.timers.tick(61000); // 06:00:01
+  assert.equal(root.getAttribute('data-sky'), 'morning');
+  assert.equal(root.getAttribute('data-theme'), 'dark');
+});
+
+test('the theme follows the night the first-paint script drew, not a clock read a moment later', async t => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: new Date(2026, 10, 18, 20, 0, 1).getTime() });
+  const root = fakeRoot();
+  root.setAttribute('data-sky', 'evening'); // drawn at 19:59:59.9, before React ran
+  root.setAttribute('data-theme', 'light');
+  const { theme } = await page({ look: { ...DEFAULT_SETTINGS, appearance: 'system' }, root });
+  theme.applyTheme('/library');
+  assert.equal(root.getAttribute('data-theme'), 'light', 'no flip between first paint and hydration');
+});
+
+// ---------- One timer, only when it can change something ----------
+
+function spyTimeouts() {
+  const calls = [];
+  const real = globalThis.setTimeout;
+  const realInterval = globalThis.setInterval;
+  globalThis.setTimeout = (fn, ms) => { calls.push(ms); return real(fn, ms); };
+  globalThis.setInterval = (fn, ms) => { calls.push(`interval ${ms}`); return realInterval(fn, ms); };
+  return { calls, restore() { globalThis.setTimeout = real; globalThis.setInterval = realInterval; } };
+}
+
+test('the sky waits with one timeout to the next period, and arms none while it is off, on a public page or hidden', async t => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: new Date(2026, 10, 18, 16, 59, 30).getTime() });
+  const spy = spyTimeouts();
+  t.after(() => spy.restore());
+  const { root, theme, listeners } = await page();
+  theme.applyTheme('/library');
+  assert.deepEqual(spy.calls, [30500], 'one timeout, just past 17:00');
+  assert.ok(!spy.calls.some(call => String(call).startsWith('interval')), 'no interval');
+
+  spy.calls.length = 0;
+  theme.saveLook({ ...DEFAULT_SETTINGS, glass: 'solid' });
+  assert.deepEqual(spy.calls, [], 'Solid glass: nothing armed');
+  t.mock.timers.tick(60000);
+  assert.equal(root.getAttribute('data-sky'), null);
+  theme.saveLook({ ...DEFAULT_SETTINGS, skyTime: false });
+  assert.deepEqual(spy.calls, [], 'switched off: nothing armed');
+
+  theme.saveLook(DEFAULT_SETTINGS); // 17:00:30: back on, armed to 20:00
+  assert.equal(root.getAttribute('data-sky'), 'evening');
+  assert.deepEqual(spy.calls, [3 * 3600000 - 30000 + 500], 'a settings change re-arms it');
+
+  spy.calls.length = 0;
+  globalThis.document.hidden = true;
+  listeners.visibilitychange();
+  t.mock.timers.tick(3 * 3600000); // 20:00:30, hidden all along
+  assert.equal(root.getAttribute('data-sky'), 'evening', 'a hidden tab does nothing');
+  assert.deepEqual(spy.calls, [], 'and arms nothing');
+  globalThis.document.hidden = false;
+  listeners.visibilitychange();
+  assert.equal(root.getAttribute('data-sky'), 'night', 'coming back into view catches up at once');
+  assert.ok(spy.calls.includes(10 * 3600000 - 30000 + 500), 're-armed to 06:00');
+
+  spy.calls.length = 0;
+  theme.applyTheme('/');
+  assert.equal(root.getAttribute('data-sky'), null);
+  assert.deepEqual(spy.calls, [], 'a public page arms nothing');
+});
+
+// ---------- Public pages: one list for first paint and theme.js ----------
+
+test('every public page in the shared list gets no sky signed out, at first paint and from theme.js alike', async t => {
+  t.mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: new Date(2026, 10, 18, 22, 0, 0).getTime() });
+  const pages = [...bootModule.LIGHT_ONLY, ...bootModule.LIGHT_SIGNED_OUT, '/guides/how-to-study'];
+  for (const path of ['/instructors', '/copyright', '/connect/claude', '/privacy', '/guides']) assert.ok(pages.includes(path), path);
+  const document_ = readFileSync(join(web, 'pages', '_document.js'), 'utf8');
+  assert.match(document_, /bootScript\(\)/, '_document uses the shared list');
+  assert.doesNotMatch(document_, /LIGHT_SIGNED_OUT\s*=/, 'and keeps no list of its own');
+  const theme_ = readFileSync(join(web, 'lib', 'theme.js'), 'utf8');
+  assert.doesNotMatch(theme_, /LIGHT_WHEN_SIGNED_OUT\s*=|'\/privacy'/, 'theme.js keeps no list of its own');
+  for (const path of pages) {
+    const root = fakeRoot();
+    vm.runInNewContext(bootModule.bootScript(), {
+      document: { documentElement: root, head: { appendChild() {} }, createElement: () => ({}) },
+      location: { pathname: path }, localStorage: { getItem: key => (key === 'userId' ? 'me' : null), length: 0, key: () => null },
+      window: { matchMedia: () => ({ matches: false }) }, matchMedia: () => ({ matches: false }), Date,
+    });
+    assert.equal(root.getAttribute('data-sky'), null, `first paint, ${path}`);
+    const { root: shown, theme } = await page({ signedIn: false });
+    theme.applyTheme(path === '/guides/how-to-study' ? '/guides/[slug]' : path);
+    assert.equal(shown.getAttribute('data-sky'), null, `theme.js, ${path}`);
+    assert.equal(theme.isLightOnly(path), true, path);
+  }
+  const { root, theme } = await page({ signedIn: false });
+  theme.applyTheme('/library');
+  assert.equal(root.getAttribute('data-sky'), 'night', 'an app page still draws it');
 });
 
 // ---------- The CSS ----------
@@ -250,22 +381,42 @@ const NIGHT_LIGHT = block(":root:is([data-sky='night'], [data-sky-from='night'])
 const NIGHT_LIGHT_CLEARER = block(":root:is([data-sky='night'], [data-sky-from='night'])[data-glass='clearer']:not([data-theme='dark'])");
 const SKY_TOKENS = ['--sky-morning-top', '--sky-morning-bottom', '--sky-evening', '--sky-night-top', '--sky-night-bottom', '--sky-night-glow', '--sky-star'];
 
-test('every sky colour is a token, in light and in dark, and the layer is drawn only from them', () => {
+const skyStart = css.indexOf('.c-sky { display: none; }');
+const skyCss = skyStart < 0 ? '' : css.slice(skyStart, css.indexOf('/* Note paper', skyStart));
+
+test('every sky colour is a token, in light and in dark, and the layers are drawn only from them', () => {
   for (const name of SKY_TOKENS) { rgba(token(LIGHT, name)); rgba(token(DARK, name)); }
-  const layer = block(':root[data-sky] body::after');
-  assert.doesNotMatch(layer, /#[0-9a-f]{3,8}\b|rgba?\(/i, 'no colour literal in the layer itself');
-  assert.doesNotMatch(layer, /url\(/, 'no image: the stars are drawn');
-  const stars = layer.match(/var\(--sky-star\)/g) || [];
+  assert.ok(skyCss.length > 0, 'the sky layers are in tokens.css');
+  assert.doesNotMatch(skyCss, /#[0-9a-f]{3,8}\b|rgba?\(/i, 'no colour literal in the layers themselves');
+  assert.doesNotMatch(skyCss, /url\(/, 'no image: the stars are drawn');
+  const night = block('.c-sky-night');
+  const stars = night.match(/var\(--sky-star\)/g) || [];
   assert.ok(stars.length >= 8 && stars.length <= 20, `a few stars (${stars.length})`);
-  assert.match(layer, /var\(--backdrop-wash\);\s*$/, 'laid over the light washes, in the backdrop\'s top layer');
-  for (const name of ['--sky-m', '--sky-e', '--sky-n']) assert.match(css, new RegExp(`@property ${name} \\{ syntax: '<number>'; inherits: false; initial-value: 0; \\}`));
+  assert.match(night, /var\(--sky-night-glow\)/);
+  assert.match(night, /var\(--sky-night-top\), var\(--sky-night-bottom\)/);
+  assert.match(block('.c-sky::before'), /var\(--sky-morning-top\), var\(--sky-morning-bottom\)/);
+  assert.match(block('.c-sky::after'), /var\(--sky-evening\)/);
+  assert.doesNotMatch(css, /@property --sky-|color-mix\([^)]*--sky-/, 'no registered numbers and no colour-mix per frame');
 });
 
-test('the crossfade is 3 seconds on named properties only, and instant under reduced motion', () => {
+test('the sky is its own layer over the washes and under every page, drawn only while data-sky is set', () => {
+  const document_ = readFileSync(join(web, 'pages', '_document.js'), 'utf8');
+  assert.match(document_, /<body>\s*(\{\/\*[\s\S]*?\*\/\}\s*)?<div className="c-sky" aria-hidden="true"><div className="c-sky-night" \/><\/div>\s*<Main \/>/, 'first in <body>, outside React');
+  assert.match(css, /body::before, body::after, \[data-theme='dark'\]::before \{\s*content: ''; position: fixed; z-index: -2;/, 'the backdrop sits under it');
+  assert.match(css, /\.c-sky \{ display: none; \}/);
+  assert.match(css, /:root\[data-sky\] \.c-sky \{ display: block; position: fixed; inset: 0; z-index: -1; pointer-events: none;/);
+  const system = readFileSync(join(web, 'styles', 'system.css'), 'utf8');
+  assert.match(system, /html\.is-restyling :not\(\.miy-sheet, \.miy-sheet \*, \.c-sky, \.c-sky \*\), html\.is-restyling :not\(\.miy-sheet \*, \.c-sky\)::before, html\.is-restyling :not\(\.miy-sheet \*, \.c-sky\)::after \{ transition: none !important; \}/, 'a restyle never cuts the crossfade short');
+});
+
+test('the crossfade is 3 seconds of opacity only, and instant under reduced motion', () => {
   assert.equal(token(LIGHT, '--dur-sky'), '3000ms');
-  const fade = block(':root[data-sky-fade] body::after');
-  assert.match(fade, /transition: --sky-m var\(--dur-sky\) var\(--ease-sky\), --sky-e var\(--dur-sky\) var\(--ease-sky\), --sky-n var\(--dur-sky\) var\(--ease-sky\);/);
-  assert.match(css, /@media \(prefers-reduced-motion: reduce\) \{ :root\[data-sky-fade\] body::after \{ transition: none; \} \}/);
+  const layers = ':root[data-sky-fade] .c-sky::before, :root[data-sky-fade] .c-sky::after, :root[data-sky-fade] .c-sky-night';
+  assert.match(css, new RegExp(`${layers.replace(/[[\]().*]/g, m => `\\${m}`)} \\{ transition: opacity var\\(--dur-sky\\) var\\(--ease-sky\\); will-change: opacity; \\}`));
+  assert.match(css, /:root\[data-sky='morning'\] \.c-sky::before, :root\[data-sky='evening'\] \.c-sky::after, :root\[data-sky='night'\] \.c-sky-night \{ opacity: 1; \}/);
+  const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce) {\n  :root[data-sky-fade]'));
+  assert.match(reduced, /^@media \(prefers-reduced-motion: reduce\) \{\n  :root\[data-sky-fade\] \.c-sky::before, :root\[data-sky-fade\] \.c-sky::after, :root\[data-sky-fade\] \.c-sky-night \{ transition: none; \}\n\}/);
+  assert.doesNotMatch(skyCss, /transition:(?!\s*(none|opacity )[^,;]*;)/, 'nothing but opacity transitions');
   assert.doesNotMatch(css, /transition:\s*all/);
 });
 

@@ -291,7 +291,10 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
                   ))}
                 </div>
                 <div className={'miy-sky' + (skyBlocked ? ' is-off' : '')}>
-                  <Toggle label="Sky follows the time" description={SKY_HINTS[skyBlocked || 'on']}
+                  <Toggle label="Sky follows the time"
+                    description={skyBlocked || !settings.skyTime || settings.appearance !== 'system' ? SKY_HINTS[skyBlocked || 'on'] : (
+                      <><span className="miy-sky-line">{SKY_HINTS.on}</span> <span className="miy-sky-line">{SKY_HINTS.matchDevice}</span></>
+                    )}
                     checked={settings.skyTime && !skyBlocked} disabled={Boolean(skyBlocked)} onChange={on => commit({ ...settings, skyTime: on })} />
                 </div>
               </div>
@@ -443,7 +446,9 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         .miy-bg-controls { gap: 10px; }
         .miy-sky { max-width: calc(4 * 92px + 3 * 10px); } /* as wide as the four background tiles, so the switch lines up with Meadow */
         .miy-sky .c-toggle.is-disabled { opacity: 1; cursor: default; }
-        .miy-sky .c-toggle.is-disabled .c-toggle-track { opacity: .5; }
+        .miy-sky .c-toggle.is-disabled .c-toggle-track { opacity: .62; }
+        .miy-sky .c-toggle-desc { text-wrap: pretty; }
+        .miy-sky-line { display: block; }
 
         .miy-row > .miy-seg { justify-self: start; max-width: 100%; }
         .miy-seg.is-locked { opacity: .6; }

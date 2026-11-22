@@ -233,7 +233,7 @@
   --backdrop-wash: radial-gradient(900px 620px at 6% -10%, rgba(255, 255, 255, 0.62), rgba(255, 255, 255, 0) 64%), radial-gradient(1100px 760px at 104% 112%, rgba(var(--accent-wash-rgb), 0.20), rgba(var(--accent-wash-rgb), 0) 62%);
   --backdrop-field: none;
   /* The time-of-day sky ("Sky follows the time", VISUAL-POLISH V3; lib/skyTime.mjs sets <html data-sky>): washes
-     over the Clouds backdrop, drawn in body::after at the end of this file. Morning brightens the sky a little,
+     over the Clouds backdrop, drawn in .c-sky at the end of this file. Morning brightens the sky a little,
      evening is a soft peach rising from the bottom (8%), night is a blue-grey veil with a few faint, static stars.
      Light keeps its night pale enough that dark text straight on the sky holds 4.5:1 (its glass thickens a little
      at night, below); dark's night is the deep blue-grey one. Measured in tests/sky-time.test.mjs. */
@@ -520,9 +520,10 @@
   --olive-glass-press: #73846A;            /* darker than olive, dark label still 4.5:1 */
   --glass-rim-border: rgba(255, 255, 255, 0.22) rgba(255, 255, 255, 0.06) rgba(255, 255, 255, 0.12) rgba(255, 255, 255, 0.18);
   --backdrop-sky-opacity: 0.18;
-  /* The time-of-day sky, dark: morning barely lifts (dark glass has no room to get lighter), evening is a deeper
-     peach so the panes stay as dark as the worst one the accents are fitted to, and night is deep blue-grey with a
-     soft light at the top left. */
+  /* The time-of-day sky, dark: dark has no morning lift you can see. The 2% here is all the room there is: at 4%
+     a clearer pane (#535853) is already lighter than the dark surface every accent is fitted to (lib/accentMath.mjs
+     SURFACES, tests/sky-time.test.mjs). Evening is a deeper peach so the panes stay as dark as that surface, and
+     night is deep blue-grey with a soft light at the top left. */
   --sky-morning-top: rgba(255, 255, 255, 0.02);
   --sky-morning-bottom: rgba(255, 255, 255, 0.01);
   --sky-evening: rgba(150, 92, 66, 0.10);
@@ -913,11 +914,12 @@ html[data-size='larger'] { font-size: 125%; --text-scale: 1.25; }
 }
 
 /* Backdrop behind the app (DESIGN-SPEC 2.1), three fixed layers that never move or take input:
-   the dark field (dark only), the cloud photo, and the light washes over it. */
+   the dark field (dark only), the cloud photo, and the light washes over it. They sit at z-index -2 so the
+   time-of-day sky (.c-sky, below, at -1) is drawn over the washes and still under every page. */
 html { background: var(--canvas); }
 body { background: transparent; }
 body::before, body::after, [data-theme='dark']::before {
-  content: ''; position: fixed; z-index: -1; pointer-events: none; user-select: none;
+  content: ''; position: fixed; z-index: -2; pointer-events: none; user-select: none;
 }
 body::before {
   inset: -48px; /* past every edge, so the blur never shows one */
@@ -928,44 +930,44 @@ body::before {
 body::after { inset: 0; background: var(--backdrop-wash); }
 [data-theme='dark']::before { inset: -120px; background: var(--backdrop-field); filter: blur(80px); }
 
-/* The time-of-day sky (VISUAL-POLISH V3): its washes and stars are laid on top of the light washes in body::after,
-   the top layer of the backdrop (body isolates its own stacking, so a layer outside it would sit under the photo).
-   They exist only while <html data-sky> is set (lib/skyTime.mjs: Clouds, the option on, not Solid glass, not reduced
-   transparency, not Paper & Clay). Each period's wash is scaled by its own registered number, 0 or 1, so a period
-   change crossfades by easing the numbers over --dur-sky while lib/theme.js holds <html data-sky-fade> (only when
-   the period moves on with the page open; never on first paint or a pick in Make it yours). A browser without
-   @property simply changes at once. The stars are static dots. */
-@property --sky-m { syntax: '<number>'; inherits: false; initial-value: 0; }
-@property --sky-e { syntax: '<number>'; inherits: false; initial-value: 0; }
-@property --sky-n { syntax: '<number>'; inherits: false; initial-value: 0; }
-:root[data-sky] body::after {
-  --sky-m: 0; --sky-e: 0; --sky-n: 0;
+/* The time-of-day sky (VISUAL-POLISH V3): three washes in their own fixed layer over the backdrop, the static
+   <div class="c-sky"> that pages/_document.js puts first in <body> (body isolates its own stacking, so the layer is
+   inside it, above the photo and the light washes at -2 and under every page). It is drawn only while <html data-sky>
+   is set (lib/skyTime.mjs: Clouds, the option on, not Solid glass, not reduced transparency, not Paper & Clay).
+   Morning is .c-sky::before, evening .c-sky::after, and night (the veil, its soft light and the static stars) is
+   .c-sky-night, on top. Each is fully drawn and only its opacity changes, so a period change while the page is open
+   (lib/theme.js holds <html data-sky-fade>) is an opacity crossfade the compositor runs: nothing is repainted per
+   frame. First paint and a pick in Make it yours change at once; so does everything under reduced motion. */
+.c-sky { display: none; }
+:root[data-sky] .c-sky { display: block; position: fixed; inset: 0; z-index: -1; pointer-events: none; user-select: none; }
+.c-sky::before, .c-sky::after, .c-sky-night { content: ''; position: absolute; inset: 0; opacity: 0; }
+.c-sky::before { background: linear-gradient(180deg, var(--sky-morning-top), var(--sky-morning-bottom)); }
+.c-sky::after { background: linear-gradient(0deg, var(--sky-evening), transparent 60%); }
+.c-sky-night {
+  z-index: 1;
   background:
-    radial-gradient(circle at 7% 9%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 1.1px, transparent 1.7px),
-    radial-gradient(circle at 15% 23%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.8px, transparent 1.4px),
-    radial-gradient(circle at 24% 6%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 1px, transparent 1.6px),
-    radial-gradient(circle at 33% 17%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.8px, transparent 1.4px),
-    radial-gradient(circle at 46% 8%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 1.2px, transparent 1.8px),
-    radial-gradient(circle at 55% 26%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.8px, transparent 1.4px),
-    radial-gradient(circle at 63% 12%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 1px, transparent 1.6px),
-    radial-gradient(circle at 72% 4%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.8px, transparent 1.4px),
-    radial-gradient(circle at 79% 19%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 1.1px, transparent 1.7px),
-    radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.9px, transparent 1.5px),
-    radial-gradient(circle at 94% 28%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.8px, transparent 1.4px),
-    radial-gradient(circle at 39% 33%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.8px, transparent 1.4px),
-    radial-gradient(circle at 11% 38%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.9px, transparent 1.5px),
-    radial-gradient(circle at 68% 36%, color-mix(in srgb, var(--sky-star) calc(var(--sky-n) * 100%), transparent) 0 0.8px, transparent 1.4px),
-    radial-gradient(70% 55% at 16% 0%, color-mix(in srgb, var(--sky-night-glow) calc(var(--sky-n) * 100%), transparent), transparent 70%),
-    linear-gradient(180deg, color-mix(in srgb, var(--sky-night-top) calc(var(--sky-n) * 100%), transparent), color-mix(in srgb, var(--sky-night-bottom) calc(var(--sky-n) * 100%), transparent)),
-    linear-gradient(0deg, color-mix(in srgb, var(--sky-evening) calc(var(--sky-e) * 100%), transparent), transparent 60%),
-    linear-gradient(180deg, color-mix(in srgb, var(--sky-morning-top) calc(var(--sky-m) * 100%), transparent), color-mix(in srgb, var(--sky-morning-bottom) calc(var(--sky-m) * 100%), transparent)),
-    var(--backdrop-wash);
+    radial-gradient(circle at 7% 9%, var(--sky-star) 0 1.1px, transparent 1.7px),
+    radial-gradient(circle at 15% 23%, var(--sky-star) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 24% 6%, var(--sky-star) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 33% 17%, var(--sky-star) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 46% 8%, var(--sky-star) 0 1.2px, transparent 1.8px),
+    radial-gradient(circle at 55% 26%, var(--sky-star) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 63% 12%, var(--sky-star) 0 1px, transparent 1.6px),
+    radial-gradient(circle at 72% 4%, var(--sky-star) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 79% 19%, var(--sky-star) 0 1.1px, transparent 1.7px),
+    radial-gradient(circle at 88% 10%, var(--sky-star) 0 0.9px, transparent 1.5px),
+    radial-gradient(circle at 94% 28%, var(--sky-star) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 39% 33%, var(--sky-star) 0 0.8px, transparent 1.4px),
+    radial-gradient(circle at 11% 38%, var(--sky-star) 0 0.9px, transparent 1.5px),
+    radial-gradient(circle at 68% 36%, var(--sky-star) 0 0.8px, transparent 1.4px),
+    radial-gradient(70% 55% at 16% 0%, var(--sky-night-glow), transparent 70%),
+    linear-gradient(180deg, var(--sky-night-top), var(--sky-night-bottom));
 }
-:root[data-sky='morning'] body::after { --sky-m: 1; }
-:root[data-sky='evening'] body::after { --sky-e: 1; }
-:root[data-sky='night'] body::after { --sky-n: 1; }
-:root[data-sky-fade] body::after { transition: --sky-m var(--dur-sky) var(--ease-sky), --sky-e var(--dur-sky) var(--ease-sky), --sky-n var(--dur-sky) var(--ease-sky); }
-@media (prefers-reduced-motion: reduce) { :root[data-sky-fade] body::after { transition: none; } }
+:root[data-sky='morning'] .c-sky::before, :root[data-sky='evening'] .c-sky::after, :root[data-sky='night'] .c-sky-night { opacity: 1; }
+:root[data-sky-fade] .c-sky::before, :root[data-sky-fade] .c-sky::after, :root[data-sky-fade] .c-sky-night { transition: opacity var(--dur-sky) var(--ease-sky); will-change: opacity; }
+@media (prefers-reduced-motion: reduce) {
+  :root[data-sky-fade] .c-sky::before, :root[data-sky-fade] .c-sky::after, :root[data-sky-fade] .c-sky-night { transition: none; }
+}
 
 /* Note paper (cream in both themes): its text always uses the paper ink. */
 .sn-paper, .sn-card-paper {

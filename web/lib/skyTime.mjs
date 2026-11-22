@@ -59,8 +59,9 @@ export function skyFor(settings, { period = skyPeriod(), reducedTransparency = f
   return skyActive(settings, { reducedTransparency, canFrost }) ? period : null;
 }
 
-// Dark mode follows the night only for Match device: the night sky turns a Match device page dark, while a student
-// who chose Light or Dark keeps it.
+// Dark mode follows the night only for Match device: a page that loads at night turns dark, while a student who
+// chose Light or Dark keeps it. Only the period at page load counts (lib/theme.js): the clock never flips light and
+// dark while a page is open.
 export function nightIsDark(appearance, sky) {
   return appearance === 'system' && sky === 'night';
 }

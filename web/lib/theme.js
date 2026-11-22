@@ -1,10 +1,8 @@
-import { USE_CASES, useCasePath } from './useCases/index.mjs';
-import { COMPARISONS, comparisonPath } from './comparisons/index.mjs';
 import { getUserId } from './api';
 import { accountCreatedAt, getProgress, progressLoaded, progressRead, updateProgress } from './progress';
 import { DEFAULT_SETTINGS, accountSettings, applySettings, bootCache, defaultAppearance, defaultSettingsFor, resolveAppearance } from './themeSettings.mjs';
-import { KEEPS_SIZE, LOOK_KEY, lookKeyFor } from './themeBoot.mjs';
-import { SKY_FADE_MS, skyFor, skyPeriod } from './skyTime.mjs';
+import { KEEPS_SIZE, LIGHT_ONLY, LOOK_KEY, lightWhenSignedOut, lookKeyFor } from './themeBoot.mjs';
+import { SKY_FADE_MS, SKY_PERIODS, msUntilNextPeriod, skyFor, skyPeriod } from './skyTime.mjs';
 
 // The look: light/dark and every "Make it yours" setting (lib/themeSettings.mjs). The account is the
 // one source of truth (progress.look, saved in Supabase user metadata next to the old progress.theme,
@@ -15,7 +13,6 @@ const KEY = 'theme'; // the old light/dark choice, still written so older tabs a
 const DEVICE_DARK = '(prefers-color-scheme: dark)';
 const LESS_TRANSPARENCY = '(prefers-reduced-transparency: reduce)';
 const LESS_MOTION = '(prefers-reduced-motion: reduce)';
-export const LIGHT_ONLY = ['/', '/login', '/signup', '/pricing', '/reset-password'];
 
 function deviceMatches(query) {
   try { return typeof window !== 'undefined' && Boolean(window.matchMedia) && window.matchMedia(query).matches; } catch { return false; }
@@ -112,12 +109,11 @@ export function themePreference() {
 }
 
 // Public pages stay light; the policy pages follow the account's theme when signed in. Pricing is in
-// LIGHT_ONLY: it is the Cordia default in light for everyone, signed in or not.
-// Use-case pages (lib/useCases/) are public reading pages too.
-// So are the guides (/guides and /guides/[slug], the route pattern _app.js passes).
-export const LIGHT_WHEN_SIGNED_OUT = ['/privacy', '/terms', '/honor-code', '/mission', '/connect/claude', '/guides', '/guides/[slug]', ...USE_CASES.map(useCasePath), ...COMPARISONS.map(comparisonPath)];
+// LIGHT_ONLY: it is the Cordia default in light for everyone, signed in or not. Both lists live in
+// lib/themeBoot.mjs, so the first-paint script and this agree on every page (the guides too: /guides/[slug] is the
+// route pattern _app.js passes, and it starts with /guides/).
 export function isLightOnly(pathname) {
-  if (LIGHT_WHEN_SIGNED_OUT.includes(pathname)) {
+  if (lightWhenSignedOut(pathname)) {
     try { return !localStorage.getItem('authToken'); } catch { return true; }
   }
   // Printed pages are always paper white.
@@ -136,21 +132,39 @@ function watchDevice() {
   }
 }
 
+// The period when this page loaded: the one the first-paint script drew (lib/themeBoot.mjs), else the clock at the
+// first applyTheme. Only it can turn a Match device page dark at night (themeSettings.mjs applySettings `loadSky`),
+// so the clock never flips light and dark while the page is open; a later period only changes the sky, and the
+// theme catches up on the next page load.
+let loadSky = null;
+function pageLoadSky() {
+  if (loadSky === null) {
+    const drawn = document.documentElement.getAttribute('data-sky');
+    loadSky = SKY_PERIODS.includes(drawn) ? drawn : skyPeriod(new Date());
+  }
+  return loadSky;
+}
+
 export function applyTheme(pathname = typeof window !== 'undefined' ? window.location.pathname : '/') {
   if (typeof document === 'undefined') return;
   lastPath = pathname;
   const settings = lookSettings();
-  applySettings(settings, { deviceIsDark: deviceIsDark(), publicPage: isLightOnly(pathname), keepSize: KEEPS_SIZE.includes(pathname), sky: skyNow(settings) });
+  const loaded = pageLoadSky();
+  const sky = skyNow(settings);
+  applySettings(settings, { deviceIsDark: deviceIsDark(), publicPage: isLightOnly(pathname), keepSize: KEEPS_SIZE.includes(pathname), sky, loadSky: loaded });
   watchDevice();
-  watchSky();
+  watchSky(Boolean(sky) && !isLightOnly(pathname));
 }
 
-// The sky follows the device's clock while the page is open. Once a minute, and whenever the page comes back into
-// view, it checks the period; when it has moved on, the new sky crossfades in over SKY_FADE_MS (styles/tokens.css,
-// <html data-sky-fade>), at most once per period, and at once under reduced motion. While it fades, data-sky-from
-// keeps the period it left, so the glass it needed stays until the old sky has gone (tokens.css, the night glass).
-// Every other change (a pick in Make it yours, first paint, a new page) is instant.
-let skyWatching = false;
+// The sky follows the device's clock while the page is open: one timer to the next period's start (none while the
+// sky is off, on a public page or in a hidden tab), re-armed on every applyTheme (a pick in Make it yours, a new
+// page) and whenever the page comes back into view. When the period has moved on, the new sky crossfades in over
+// SKY_FADE_MS (styles/tokens.css, <html data-sky-fade>), at most once per period, and at once under reduced motion.
+// While it fades, data-sky-from keeps the period it left, so the glass it needed stays until the old sky has gone
+// (tokens.css, the night glass). Every other change (a pick, first paint, a new page) is instant.
+let skyListening = false;
+let skyTimer = 0;
+let skyFollows = false;
 let fadeTimer = 0;
 let lastFade = null;
 function checkSky() {
@@ -158,22 +172,34 @@ function checkSky() {
   const root = document.documentElement;
   const shown = root.getAttribute('data-sky');
   const next = isLightOnly(lastPath) ? null : skyNow(lookSettings());
-  if (!shown || !next || shown === next) return;
-  if (lastFade !== next && !deviceMatches(LESS_MOTION)) {
-    lastFade = next;
-    clearTimeout(fadeTimer);
-    root.setAttribute('data-sky-from', shown);
-    root.setAttribute('data-sky-fade', '');
-    fadeTimer = setTimeout(() => { root.removeAttribute('data-sky-fade'); root.removeAttribute('data-sky-from'); }, SKY_FADE_MS + 100);
+  if (shown && next && shown !== next) {
+    if (lastFade !== next && !deviceMatches(LESS_MOTION)) {
+      lastFade = next;
+      clearTimeout(fadeTimer);
+      root.setAttribute('data-sky-from', shown);
+      root.setAttribute('data-sky-fade', '');
+      fadeTimer = setTimeout(() => { root.removeAttribute('data-sky-fade'); root.removeAttribute('data-sky-from'); }, SKY_FADE_MS + 100);
+    }
+    holdTransitions(); // the light night glass comes or goes on this frame: every pane changes at once
+    applyTheme(lastPath); // re-arms the timer
+    return;
   }
-  holdTransitions(); // a Match device page may turn dark with the night: every colour swaps at once
-  applyTheme(lastPath);
+  armSky();
 }
-function watchSky() {
-  if (skyWatching || typeof window === 'undefined' || typeof document.addEventListener !== 'function') return;
-  skyWatching = true;
-  setInterval(checkSky, 60000);
-  document.addEventListener('visibilitychange', checkSky);
+function armSky() {
+  clearTimeout(skyTimer);
+  skyTimer = 0;
+  if (!skyFollows || document.hidden) return;
+  skyTimer = setTimeout(checkSky, msUntilNextPeriod(new Date()) + 500); // just past the hour, so the period has turned
+}
+function watchSky(follows) {
+  if (typeof window === 'undefined' || typeof document.addEventListener !== 'function') return;
+  skyFollows = follows;
+  if (!skyListening) {
+    skyListening = true;
+    document.addEventListener('visibilitychange', () => (document.hidden ? armSky() : checkSky()));
+  }
+  armSky();
 }
 
 // A look change swaps every colour at once: for two frames nothing on the page transitions, so parts with

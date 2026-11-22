@@ -647,9 +647,8 @@ body:has(.about) .c-fab { display: none; }
 .c-list > .c-list-row:last-child { border-bottom-left-radius: inherit; border-bottom-right-radius: inherit; }
 
 /* While a look changes (lib/theme.js saveLook), nothing outside the Make it yours sheet transitions, so every
-   colour changes on the same frame. */
-html.is-restyling :not(.miy-sheet, .miy-sheet *), html.is-restyling :not(.miy-sheet *)::before, html.is-restyling :not(.miy-sheet *, body)::after { transition: none !important; }
-/* body::after is the backdrop's top layer: its time-of-day sky keeps its own slow crossfade through a restyle (styles/tokens.css). */
+   colour changes on the same frame. The time-of-day sky (.c-sky, styles/tokens.css) keeps its own slow crossfade. */
+html.is-restyling :not(.miy-sheet, .miy-sheet *, .c-sky, .c-sky *), html.is-restyling :not(.miy-sheet *, .c-sky)::before, html.is-restyling :not(.miy-sheet *, .c-sky)::after { transition: none !important; }
 
 /* Keyboard focus, everywhere: a solid 2px ring in --focus-ring, 2px out (3:1 or better on every
    surface in both themes). !important so no component's own outline, or outline: none, can hide it.

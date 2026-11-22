@@ -236,16 +236,17 @@ export function bootCache(settings) {
 // Puts a look on <html>: sets or removes the data attributes, writes (or clears) the custom accent's
 // variables, and sets data-theme from the appearance. `publicPage` pages are always the Cordia
 // default in light, whatever was saved. `sky` is the time-of-day period to draw (lib/skyTime.mjs skyFor, null when
-// the sky does not follow the time): it becomes data-sky, and at night it turns a Match device page dark.
-// Returns what it applied.
-export function applySettings(settings, { root, deviceIsDark = false, publicPage = false, keepSize = false, sky = null } = {}) {
+// the sky does not follow the time): it becomes data-sky. `loadSky` is the period when the page loaded (the same as
+// `sky` unless told otherwise): only a night at page load turns a Match device page dark, so the clock alone never
+// flips light and dark while a page is open (lib/theme.js). Returns what it applied.
+export function applySettings(settings, { root, deviceIsDark = false, publicPage = false, keepSize = false, sky = null, loadSky = sky } = {}) {
   const target = root || (typeof document !== 'undefined' ? document.documentElement : null);
   // A public page keeps the student's text size when it is asked to (`keepSize`): that is for reading, not looks.
   const clean = publicPage ? { ...DEFAULT_SETTINGS, appearance: 'light', ...(keepSize ? { size: validateSettings(settings).size } : {}) } : validateSettings(settings);
   const attributes = attributesFor(clean);
   const variables = customAccentVariables(clean);
   const period = !publicPage && skyAllowed(clean) && SKY_PERIODS.includes(sky) ? sky : null;
-  const theme = resolveAppearance(clean.appearance, deviceIsDark || nightIsDark(clean.appearance, period));
+  const theme = resolveAppearance(clean.appearance, deviceIsDark || Boolean(period && nightIsDark(clean.appearance, loadSky)));
   if (target) {
     for (const [attribute, value] of Object.entries(attributes)) {
       if (value) { if (target.getAttribute(attribute) !== value) target.setAttribute(attribute, value); } else target.removeAttribute(attribute);
