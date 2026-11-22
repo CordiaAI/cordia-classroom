@@ -134,67 +134,63 @@ class WrittenItemTests(unittest.TestCase):
 DISCIPLINES = {
     "nursing": ("How does hand hygiene reduce hospital infections?",
                 "Hand hygiene removes the microorganisms on a nurse's hands, so they cannot spread between patients and cause infections.",
-                ["Explain how hand hygiene reduces the spread of infections between patients.",
-                 "Describe the role hand hygiene plays in how microorganisms spread between patients.",
-                 "Compare the effect of hand hygiene on microorganisms and on infections.",
-                 "Discuss why hand hygiene is needed to reduce infections between patients.",
-                 "In what ways does hand hygiene affect the spread of infections?",
-                 "Why can microorganisms on a nurse's hands cause infections between patients?",
-                 "How does hand hygiene reduce infections between patients?"]),
+                ["Why does hand hygiene reduce hospital infections?",
+                 "How does hand hygiene remove the microorganisms on a nurse's hands?",
+                 "Explain how hand hygiene reduces hospital infections.",
+                 "Describe how hand hygiene removes the microorganisms on a nurse's hands.",
+                 "Discuss why hand hygiene removes the microorganisms on a nurse's hands.",
+                 "In what ways does hand hygiene reduce hospital infections?",
+                 "Compare hand hygiene with the microorganisms on a nurse's hands."]),
     "art history": ("Why did Impressionist painters work outdoors?",
                     "They wanted to capture changing light and atmosphere directly, so they painted outdoors in a single sitting rather than in a studio.",
-                    ["Explain why Impressionist painters wanted to capture changing light.",
+                    ["Why did Impressionist painters work outdoors?",
+                     "How did Impressionist painters capture changing light and atmosphere?",
+                     "Explain why Impressionist painters wanted to capture changing light.",
                      "Describe the role of changing light and atmosphere for painters who painted outdoors.",
-                     "Compare painting outdoors in a single sitting with painting in a studio.",
-                     "How did the need to capture light affect where painters worked?",
-                     "In what ways did painting outdoors affect Impressionist painters?",
                      "Discuss why painters painted outdoors in a single sitting rather than in a studio.",
-                     "Why did Impressionist painters paint outdoors?"]),
+                     "In what ways did Impressionist painters capture changing light and atmosphere directly?"]),
     "business law": ("What is consideration in a contract?",
                      "Consideration is something of value that each party exchanges, and without it a promise is generally not an enforceable contract.",
-                     ["Why is consideration needed for a promise to be an enforceable contract?",
-                      "Explain what each party exchanges as consideration in a contract.",
-                      "Describe why a promise without consideration is not an enforceable contract.",
-                      "Compare a promise with consideration to a promise without it in a contract.",
-                      "Discuss how consideration affects whether a promise is enforceable.",
-                      "In what ways does consideration give a promise value in a contract?",
-                      "How does consideration make a promise an enforceable contract?"]),
+                     ["Why is consideration something of value?",
+                      "How is consideration something of value that each party exchanges?",
+                      "Explain what consideration is in a contract.",
+                      "Describe consideration in a contract.",
+                      "Discuss why consideration is something of value that each party exchanges.",
+                      "In what ways is consideration something of value that each party exchanges?"]),
     "literature": ("How does Orwell use Napoleon to show the corruption of power in Animal Farm?",
                    "Napoleon gradually adopts the habits of the farmers he drove out, which shows how absolute power corrupts those who hold it.",
-                   ["Explain how Napoleon adopts the habits of the farmers in Animal Farm.",
-                    "Describe how absolute power corrupts Napoleon in Animal Farm.",
-                    "Compare Napoleon with the farmers he drove out.",
-                    "Discuss why Napoleon's habits show how power corrupts.",
-                    "Why does Orwell show power corrupting those who hold it?",
-                    "In what ways does Napoleon affect the habits of the farm?",
-                    "How does Orwell use Napoleon to show the corruption of power?"]),
+                   ["Why does Napoleon gradually adopt the habits of the farmers he drove out?",
+                    "How does Orwell use Napoleon to show the corruption of power?",
+                    "Explain how Napoleon adopts the habits of the farmers in Animal Farm.",
+                    "Describe how Napoleon gradually adopts the habits of the farmers.",
+                    "Discuss how absolute power corrupts those who hold it.",
+                    "In what ways does Napoleon adopt the habits of the farmers he drove out?"]),
     "computer science": ("What is recursion and why does it need a base case?",
                          "Recursion is when a function calls itself; it needs a base case so the calls eventually stop instead of continuing forever.",
-                         ["Explain why a recursive function needs a base case.",
-                          "Describe what happens when a function calls itself without a base case.",
-                          "Compare a function that calls itself with a base case.",
-                          "Discuss how the base case affects when the calls stop.",
-                          "How does the base case stop the calls from continuing forever?",
-                          "Why does recursion need a base case?",
-                          "In what ways does a base case change when a function calls itself?"]),
+                         ["How do the calls eventually stop instead of continuing forever?",
+                          "Describe what recursion is.",
+                          "Discuss why the calls eventually stop instead of continuing forever.",
+                          "In what ways does a function call itself?",
+                          "Compare recursion with a function that calls itself."]),
 }
 
 
 class WrittenShortQuestionTests(unittest.TestCase):
-    def test_every_opening_the_prompt_allows_passes_in_every_discipline(self):
+    def test_every_opening_the_prompt_allows_passes_when_the_source_says_it(self):
         openings = ("Why", "How", "Explain", "Describe", "Compare", "Discuss", "In what ways")
+        seen = set()
         for name, (question, answer, written) in DISCIPLINES.items():
-            seen = {next(word for word in openings if text.startswith(word)) for text in written}
-            self.assertEqual(seen, set(openings), name)
             for text in written:
+                seen.add(next(word for word in openings if text.startswith(word)))
                 self.assertEqual(P.check_short(text, question, answer), text, f"{name}: {text}")
+        self.assertEqual(seen, set(openings))
 
     def test_plain_question_words_are_not_new_facts(self):
         q, a = DISCIPLINES["business law"][:2]
-        self.assertIsNotNone(P.check_short("Why is consideration needed for a promise?", q, a))
-        self.assertIsNotNone(P.check_short("In what ways does consideration affect a promise?", q, a))
+        self.assertIsNotNone(P.check_short("Why is consideration needed in a contract?", q, a))
+        self.assertIsNotNone(P.check_short("Describe the role of consideration in a contract.", q, a))
         q, a = DISCIPLINES["art history"][:2]
-        self.assertIsNotNone(P.check_short("Explain the role of changing light for painters.", q, a))
+        self.assertIsNotNone(P.check_short("Explain the role of changing light and atmosphere.", q, a))
 
     def test_a_name_date_or_term_the_guide_never_gave_is_still_refused(self):
         refused = [
@@ -203,6 +199,24 @@ class WrittenShortQuestionTests(unittest.TestCase):
             ("business law", "Describe the role of the Statute of Frauds in a contract."),
             ("nursing", "Explain why hand hygiene stops MRSA."),
             ("computer science", "Discuss how recursion differs from a for loop."),
+        ]
+        for name, text in refused:
+            question, answer, _ = DISCIPLINES[name]
+            self.assertIsNone(P.check_short(text, question, answer), text)
+
+    def test_a_relationship_the_source_never_states_is_refused(self):
+        """Words like affect, change, cause, lead, only, before assert something; they are never question glue."""
+        refused = [
+            ("nursing", "In what ways does hand hygiene affect the spread of infections?"),
+            ("nursing", "Compare the effect of hand hygiene on microorganisms and on infections."),
+            ("art history", "How did the need to capture light affect where painters worked?"),
+            ("art history", "In what ways did painting outdoors affect Impressionist painters?"),
+            ("business law", "Discuss how consideration affects whether a promise is enforceable."),
+            ("business law", "How does consideration make a promise an enforceable contract?"),
+            ("literature", "In what ways does Napoleon affect the habits of the farm?"),
+            ("computer science", "Discuss how the base case affects when the calls stop."),
+            ("computer science", "In what ways does a base case change when a function calls itself?"),
+            ("computer science", "Explain why recursion causes the calls to continue forever."),
         ]
         for name, text in refused:
             question, answer, _ = DISCIPLINES[name]
@@ -236,6 +250,31 @@ class RelatedWordFormTests(unittest.TestCase):
         pairs = [{"question": "What is recursion?", "answer": "Recursion is a recursive process where a function calls itself with a smaller input."}]
         self.assertEqual(P.matching(pairs), [])
 
+    def test_related_forms_across_disciplines_give_the_term_away(self):
+        self.assertTrue(P._gives_away("Mitosis", "A mitotic division of one cell into two identical cells"))
+        self.assertTrue(P._gives_away("Irony", "An ironic gap between what is said and what is meant"))
+        self.assertTrue(P._gives_away("Liability", "Being liable in law for harm caused to another"))
+        self.assertTrue(P._gives_away("Sepsis", "A septic response of the body to an infection"))
+
+    def test_words_that_only_share_their_first_letters_are_different_words(self):
+        """No fixed-length prefix: contract is not control, influenza is not influence."""
+        self.assertFalse(P._gives_away("Contract", "A control a court places on a party"))
+        self.assertFalse(P._gives_away("Influenza", "An illness under the influence of a virus"))
+        self.assertFalse(P._gives_away("Simile", "A similar comparison using like or as"))
+        self.assertNotEqual(P._form("contraindicated"), P._form("contract"))
+        self.assertNotEqual(P._form("important"), P._form("import"))
+
+    def test_plain_word_forms(self):
+        self.assertEqual({P._form(word) for word in ("cause", "causes", "caused", "causing")}, {P._form("cause")})
+        self.assertEqual({P._form(word) for word in ("use", "uses", "used", "using")}, {"use"})
+        self.assertEqual({P._form(word) for word in ("give", "gave", "given", "giving", "gives")}, {"give"})
+        self.assertEqual(P._form("ways"), "way")
+        self.assertEqual(P._form("led"), P._form("lead"))
+        self.assertEqual(P._form("stopped"), "stop")
+        # Short words stay themselves: "one" is not the glue word "on", "noted" is not "not".
+        self.assertNotEqual(P._form("one"), P._form("on"))
+        self.assertNotEqual(P._form("noted"), P._form("not"))
+
 
 class LikelyTermTests(unittest.TestCase):
     def test_only_pairs_likely_to_give_a_term_are_candidates(self):
@@ -257,6 +296,17 @@ class LikelyTermTests(unittest.TestCase):
         self.assertNotIn(4, P.matching_candidates(pairs) + P.short_candidates(pairs) + P.fill_candidates(pairs))
         self.assertEqual(P.short_answer(pairs), [])
         self.assertIn(5, [item["source"] for item in P.matching(pairs)])  # later pairs keep the guide's own index
+
+    def test_hiding_or_showing_a_pair_changes_the_cache_key(self):
+        pairs = [dict(pair) for pair in PAIRS]
+        before = P.source_hash(pairs)
+        pairs[4]["hidden"] = True
+        hidden = P.source_hash(pairs)
+        self.assertNotEqual(before, hidden)
+        cached = {"v": P.VERSION, "source": before, "short": P.short_answer(PAIRS)}
+        self.assertEqual(P.cached(cached, pairs), {})  # items built while pair 4 was shown are rebuilt
+        pairs[4]["hidden"] = False
+        self.assertEqual(P.source_hash(pairs), before)
 
 
 class PrintRouteTests(unittest.TestCase):
