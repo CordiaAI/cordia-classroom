@@ -92,7 +92,7 @@ function seed() {
   ];
   state.grades = { 101: { canvas_score: 88, canvas_letter: 'B', score: 88, letter: 'B', weighted: false, upcoming: [] }, 102: { score: null, letter: null, upcoming: [] } };
   state.sets = [
-    { id: 's1', title: 'Exam 3 practice problems', card_count: 42, studied_by: 6, owner_name: 'Maya', mine: false, saved: false, versions: [] },
+    { id: 's1', title: 'Exam 3 practice problems', card_count: 42, studied_by: 6, owner_name: 'Daniela', mine: false, saved: false, versions: [] },
     { id: 's2', title: 'Related rates cards', card_count: 18, studied_by: 2, owner_name: null, mine: true, saved: false, versions: [] },
   ];
   state.chatsApi = 'full';
