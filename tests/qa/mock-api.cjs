@@ -201,7 +201,12 @@ async function install(context, state) {
     if (path === '/auth/me') return json({ user_id: USER, email: 'test.student@example.com', name: 'Test Student' });
     if (path === '/auth/profile') return json({ updated: ['university'] });
     if (path === '/feedback/reviewer-status') return json({ reviewer: false });
+    // A test can make one request fail: state.failRoute = (method, path) => ({ status, json }) | undefined.
+    const forced = state.failRoute?.(method, path);
+    if (forced) return route.fulfill({ status: forced.status, json: forced.json || {} });
     if (path === '/folders' && method === 'GET') return json({ folders: state.folders });
+    if ((m = path.match(/^\/folders\/([^/]+)$/)) && method === 'DELETE') { state.folders = state.folders.filter(item => item.id !== m[1]); return json({ deleted: true }); }
+    if ((m = path.match(/^\/classes\/([^/]+)$/)) && method === 'DELETE') return json({ ok: true });
     if ((m = path.match(/^\/folders\/([^/]+)$/)) && method === 'PATCH') { const f = state.folders.find(item => item.id === m[1]); if (f) f.name = body.name; return json(f ? { folder: f } : { detail: 'Class not found' }); }
     // Canvas-linked class: set state.canvas (a /canvas/status payload) to turn these on.
     if (path === '/canvas/status' && state.canvas) return json(state.canvas);
@@ -227,7 +232,13 @@ async function install(context, state) {
       const g = state.guides.find(x => x.id === m[1]);
       if (m[2] === 'bookmark') { g.is_bookmarked = !g.is_bookmarked; return json({ is_bookmarked: g.is_bookmarked }); }
       if (m[2] === 'rename') { g.title = body.title; return json({ title: g.title }); }
-      if (m[2] === 'move') { g.folder_id = body.folder_id; return json({ updated: true }); }
+      if (m[2] === 'move') {
+        g.folder_id = body.folder_id;
+        // state.sharedWith = { guideId: 'MGT 300' }: a guide shared with a class goes private when moved (backend routers/guides.py).
+        const unshared = state.sharedWith?.[g.id];
+        if (unshared) delete state.sharedWith[g.id];
+        return json({ updated: true, folder_id: body.folder_id, ...(unshared ? { unshared_from: unshared } : {}) });
+      }
       if (m[2] === 'flashcard-progress') { g.flashcard_progress = body; return json({ updated: true }); }
       return json({ updated: true });
     }

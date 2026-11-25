@@ -1,57 +1,53 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { apiFetch, getToken } from './api';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
+import { getToken } from './api';
+import { createUndoQueue, pathsOf, sendDeleteFrom } from './guideActions';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export const UNDO_MS = 6000;
 
-// Delete with a 6-second Undo: the item disappears at once, the request is sent only
-// when the toast runs out (or right away if the page closes first).
-export function useUndoDelete(onUndo) {
-  const [pending, setPending] = useState(null); // { id, title, path?, also? } (path defaults to the guide; also: more paths deleted with it)
-  const timer = useRef(null);
-  const pendingRef = useRef(null);
+const NONE = { pending: null, hidden: new Set() };
 
-  const commit = useCallback(item => {
-    if (!item) return;
-    apiFetch(item.path || '/guides/' + item.id, { method: 'DELETE' });
-    for (const path of item.also || []) apiFetch(path, { method: 'DELETE' });
-  }, []);
-
-  const flush = useCallback(() => {
-    clearTimeout(timer.current);
-    const item = pendingRef.current;
-    pendingRef.current = null;
-    setPending(null);
-    commit(item);
-  }, [commit]);
+// Delete with a 6-second Undo: the item disappears at once, the request is sent only when the toast
+// runs out (or right away if the page closes first). The item stays hidden until the server answers:
+// then onDeleted(item) says it is gone for good, or onFailed(item, message) says why it is back.
+// pending: { id, title, path?, also? } (path defaults to the guide; also: more paths deleted with it)
+// hidden: ids to leave out of the list (the one waiting and the ones being deleted)
+// source: the page that owns the queue; it is named in the announcement so that page does not read its own lists again.
+export function useUndoDelete({ onUndo, onDeleted, onFailed, source } = {}) {
+  const callbacks = useRef({});
+  callbacks.current = { onUndo, onDeleted, onFailed };
+  const queue = useMemo(() => {
+    const subscribers = new Set();
+    const made = createUndoQueue({
+      send: sendDeleteFrom(source),
+      delay: UNDO_MS,
+      onChange: () => subscribers.forEach(listener => listener()),
+      onDeleted: item => callbacks.current.onDeleted?.(item),
+      onFailed: (item, message) => callbacks.current.onFailed?.(item, message),
+    });
+    return { ...made, subscribe: listener => { subscribers.add(listener); return () => subscribers.delete(listener); } };
+  }, [source]);
+  const state = useSyncExternalStore(queue.subscribe, queue.snapshot, () => NONE);
 
   useEffect(() => {
     const onUnload = () => {
-      const item = pendingRef.current;
+      const item = queue.leave();
       if (!item) return;
-      for (const path of [item.path || '/guides/' + item.id, ...(item.also || [])]) {
+      for (const path of pathsOf(item)) {
         fetch(API + path, { method: 'DELETE', keepalive: true, headers: { Authorization: 'Bearer ' + getToken() } });
       }
-      pendingRef.current = null;
     };
     window.addEventListener('pagehide', onUnload);
-    return () => { window.removeEventListener('pagehide', onUnload); flush(); };
-  }, [flush]);
+    return () => { window.removeEventListener('pagehide', onUnload); queue.flush(); };
+  }, [queue]);
 
-  function remove(item) {
-    if (pendingRef.current) flush();
-    pendingRef.current = item;
-    setPending(item);
-    timer.current = setTimeout(flush, UNDO_MS);
-  }
-
-  function undo() {
-    clearTimeout(timer.current);
-    const item = pendingRef.current;
-    pendingRef.current = null;
-    setPending(null);
-    onUndo?.(item);
-  }
-
-  return { pending, remove, undo };
+  return {
+    pending: state.pending,
+    hidden: state.hidden,
+    remove: queue.remove,
+    undo() {
+      const item = queue.undo();
+      callbacks.current.onUndo?.(item);
+    },
+  };
 }

@@ -15,6 +15,7 @@ import AddClass from '../../components/AddClass';
 import { ClassDeadlines, ClassSets } from '../../components/ClassSets';
 import { openNewSheet } from '../../lib/newSheet';
 import { invalidateFolders, loadFolders } from '../../lib/folders';
+import { carryNotice, moveAndReport, moveGuide, removeClass, toastMs } from '../../lib/guideActions';
 import { canvasStatus } from '../../lib/canvas';
 import { CourseFiles } from '../../components/CanvasClasses';
 import ClassGrades from '../../components/ClassGrades';
@@ -74,7 +75,7 @@ export default function ClassPage() {
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(''), 2500);
+    const timer = setTimeout(() => setToast(''), toastMs(toast));
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -121,11 +122,14 @@ export default function ClassPage() {
     setToast(next ? 'Your first name shows on sets you share' : 'Your sets are shared without your name');
   }
 
-  async function moveGuide(item, folderId) {
-    const data = await apiFetch('/guides/' + item.id + '/move', { method: 'PATCH', body: JSON.stringify({ folder_id: folderId }) });
-    if (!data?.updated) return;
+  // Named moveItem, not moveGuide: a local moveGuide shadows the import and calls itself (feedback F3).
+  async function moveItem(item, folderId) {
+    const className = folderId ? folders.find(f => f.id === folderId)?.name : 'Unfiled';
+    const result = await moveAndReport(moveGuide, { id: item.id, folderId, className });
+    setToast(result.message);
+    // Gone, or into a class that is gone: what this page lists is out of date.
+    if (!result.ok) { if (result.reload) loadData(); return; }
     setItems(current => current.filter(row => row.id !== item.id));
-    setToast('Moved to ' + (folderId ? folders.find(f => f.id === folderId)?.name : 'Unfiled'));
   }
 
   async function saveName(event) {
@@ -145,8 +149,12 @@ export default function ClassPage() {
       title: `Delete ${folder.name}?`,
       onConfirm: async () => {
         // Deleting the class also leaves its shared class, so it doesn't come back as a link.
-        await Promise.all([apiFetch('/folders/' + id, { method: 'DELETE' }), folder.class_id && apiFetch('/classes/' + folder.class_id, { method: 'DELETE' })]);
-        invalidateFolders();
+        const result = await removeClass(folder);
+        setConfirm(null);
+        // Partly done (the class is gone, leaving its shared class failed): this page is for something that
+        // no longer exists, so Library shows what is left, with the reason.
+        if (result.partial) { carryNotice(result.message); router.push('/library'); return; }
+        if (!result.ok) { setToast(result.message); return; }
         router.push('/library');
       },
     });
@@ -239,8 +247,8 @@ export default function ClassPage() {
                   <Menu
                     label={`More for ${item.title}`}
                     items={[{ label: 'Move to class', icon: FolderInput, items: [
-                      { label: 'Unfiled', onSelect: () => moveGuide(item, null) },
-                      ...folders.filter(f => f.id !== id).map(f => ({ label: f.name, onSelect: () => moveGuide(item, f.id) })),
+                      { label: 'Unfiled', onSelect: () => moveItem(item, null) },
+                      ...folders.filter(f => f.id !== id).map(f => ({ label: f.name, onSelect: () => moveItem(item, f.id) })),
                     ] }]}
                   />
                 )}

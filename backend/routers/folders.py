@@ -130,10 +130,12 @@ def delete_folder(folder_id: str, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
-    supabase.table("folders") \
+    result = supabase.table("folders") \
         .delete() \
         .eq("id", folder_id) \
         .eq("user_id", user_id) \
         .execute()
 
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Class not found")
     return {"deleted": True}

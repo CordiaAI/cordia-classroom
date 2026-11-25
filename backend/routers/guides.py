@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field, field_validator
 from typing import Literal, Optional
 from database import get_supabase
 from services.llm import guide_title
-from services.sharing import on_guide_changed
+from services.sharing import on_guide_changed, sync_guide_visibility
 from routers.quiz import start_quiz_warmup
 from services import guide_versions, ideas
 from auth_utils import get_user_id
@@ -418,11 +418,15 @@ def delete_guide(guide_id: str, authorization: str = Header(default="")):
     user_id = get_user_id(authorization)
     supabase = get_supabase()
 
-    supabase.table("study_guides") \
+    result = supabase.table("study_guides") \
         .delete() \
         .eq("id", guide_id) \
         .eq("user_id", user_id) \
         .execute()
+
+    # A guide that is not the student's, or is already gone, deleted nothing: say so, never "deleted".
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
 
     return {"deleted": True}
 
@@ -634,6 +638,39 @@ class MoveGuideRequest(BaseModel):
         return v
 
 
+def _stop_sharing_with_old_class(supabase, user_id: str, guide_id: str, folder_id: Optional[str]) -> Optional[str]:
+    """A guide shared with one class must not stay in that class once it is filed in another (or in none):
+    its share goes private, the same as taking it out of the class does (POST /classes/unfile).
+    Returns the label of the class it stopped being shared with (so the student is told), or None when
+    nothing changed. Policy to confirm with the owner: the new class's share default is NOT applied."""
+    shared = (supabase.table("shared_sets").select("id,class_id,visibility").eq("guide_id", guide_id).eq("owner_id", user_id).limit(1).execute().data or [None])[0]
+    if not shared or shared.get("visibility") != "class":
+        return None
+    new_class = None
+    if folder_id:
+        folder = (supabase.table("folders").select("class_id").eq("id", folder_id).eq("user_id", user_id).limit(1).execute().data or [None])[0]
+        new_class = folder.get("class_id") if folder else None
+    if new_class == shared.get("class_id"):
+        return None
+    supabase.table("shared_sets").update({"visibility": "private"}).eq("id", shared["id"]).execute()
+    sync_guide_visibility(supabase, user_id, guide_id, "private")
+    return _old_class_label(supabase, user_id, shared.get("class_id"))
+
+
+def _old_class_label(supabase, user_id: str, class_id: Optional[str]) -> str:
+    """What the student calls the class a guide stopped being shared with: its course code, else their own
+    class name for it. Never raises: the share is already private, a missing name only shortens the toast."""
+    try:
+        row = (supabase.table("classes").select("course_code_normalized").eq("id", class_id).limit(1).execute().data or [None])[0]
+        if row and row.get("course_code_normalized"):
+            return row["course_code_normalized"]
+        folder = (supabase.table("folders").select("name").eq("user_id", user_id).eq("class_id", class_id).limit(1).execute().data or [None])[0]
+        return (folder or {}).get("name") or "its old class"
+    except Exception:
+        logger.warning("Naming the class a guide stopped being shared with failed", exc_info=True)
+        return "its old class"
+
+
 @router.patch("/{guide_id}/move")
 def move_guide(guide_id: str, request: MoveGuideRequest, authorization: str = Header(default="")):
     """Move a guide to a different folder (or remove from folder if folder_id is None)."""
@@ -653,13 +690,26 @@ def move_guide(guide_id: str, request: MoveGuideRequest, authorization: str = He
 
     require_own_folder(supabase, user_id, request.folder_id)
 
-    supabase.table("study_guides") \
+    result = supabase.table("study_guides") \
         .update({"folder_id": request.folder_id}) \
         .eq("id", guide_id) \
         .eq("user_id", user_id) \
         .execute()
 
-    return {"updated": True, "folder_id": request.folder_id}
+    # Deleted in another tab between the check and the update: nothing moved.
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Guide not found")
+
+    # The move is done; a sharing hiccup must not turn it into an error (the guide stays shared, as before).
+    unshared_from = None
+    try:
+        unshared_from = _stop_sharing_with_old_class(supabase, user_id, guide_id, request.folder_id)
+    except Exception:
+        logger.warning("Stopping a share after a move failed for guide %s", guide_id, exc_info=True)
+    answer = {"updated": True, "folder_id": request.folder_id}
+    if unshared_from:
+        answer["unshared_from"] = unshared_from
+    return answer
 
 
 class ReadProgressRequest(BaseModel):

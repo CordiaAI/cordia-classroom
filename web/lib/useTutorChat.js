@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { apiErrorMessage, apiFetch, authOnlyHeaders, responseJson } from './api';
 import { loadFolders } from './folders';
+import { GUIDES_ORGANIZED, deleteGuide, guidesReorganized } from './guideActions';
 import { lastGuide } from './userStore';
 import { walkthroughEvent } from './walkthrough';
 import { tutorMode } from './tutorPrefs';
@@ -172,6 +173,20 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
     function onFocus() {
       if (!document.hidden && Date.now() - lastLoad > 15000) loadMaterials();
     }
+    // A guide was moved to another class or deleted from a page (lib/guideActions.js): the Tutor's own
+    // list follows at once, so it never offers a guide that is gone or sends the old class with a message.
+    function onOrganized(event) {
+      const { ids = [], folderId, deleted, classDeleted } = event.detail || {};
+      if (!ids.length && !classDeleted) { loadMaterials(); return; }
+      if (providedGuides) return;
+      setLoadedGuides(current => current
+        .filter(guide => !(deleted && ids.includes(guide.id)))
+        .map(guide => {
+          if (classDeleted && guide.folder_id === classDeleted) return { ...guide, folder_id: null };
+          return ids.includes(guide.id) && folderId !== undefined ? { ...guide, folder_id: folderId } : guide;
+        }));
+    }
+    window.addEventListener(GUIDES_ORGANIZED, onOrganized);
     loadMaterials();
     router.events.on('routeChangeComplete', loadMaterials);
     document.addEventListener('visibilitychange', onFocus);
@@ -181,6 +196,7 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
       router.events.off('routeChangeComplete', loadMaterials);
       document.removeEventListener('visibilitychange', onFocus);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener(GUIDES_ORGANIZED, onOrganized);
     };
   }, [providedGuides, router.events]);
 
@@ -473,6 +489,8 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
         setContextKey(`guide:${data.guide.id}`);
       }
     }
+    // The Tutor filed a guide in a class (or took it out of one): the lists on the page and the chats by class follow.
+    if (data?.action === 'organized_material') guidesReorganized();
     // The Tutor opened something in the app ("open my BUS 101 class").
     if (data?.action === 'navigate' && data.link?.href) router.push(data.link.href);
     // A renamed guide that is open refreshes like an edited outline does.
@@ -604,8 +622,8 @@ export function useTutorChat({ guides: providedGuides = null, preferredGuideId =
   }
 
   async function deleteFromTutor(confirm) {
-    const done = await apiFetch(`/guides/${confirm.guide_id}`, { method: 'DELETE' });
-    if (!done?.deleted) { setLocalError(done?.detail || `Could not delete ${confirm.title}.`); return; }
+    const done = await deleteGuide(confirm.guide_id);
+    if (!done.ok) { setLocalError(done.message || `Could not delete ${confirm.title}.`); return; }
     setLoadedGuides(current => current.filter(item => item.id !== confirm.guide_id));
     if (contextKey === `guide:${confirm.guide_id}`) setContextKey('none');
     setSession(current => ({
