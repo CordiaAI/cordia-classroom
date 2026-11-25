@@ -50,6 +50,17 @@ export const SIZE_NAMES = { small: 'Small', default: 'Default', large: 'Large', 
 export const APPEARANCE_NAMES = { light: 'Light', dark: 'Dark', system: 'Match device' };
 export const GLASS_CHOICES = ['frosted', 'clearer', 'solid'];
 export const GLASS_NAMES = { frosted: 'Frosted', clearer: 'Clearer', solid: 'Solid' };
+// The line under "Sky follows the time": what it does, or why it is off right now (lib/skyTime.mjs skyBlockedBy).
+// With Match device it adds `matchDevice`: the night turns the app dark only when a page loads (lib/theme.js), so the
+// sheet says so rather than leave a student waiting for it at 8 PM (lib/skyTime.mjs SKY_STARTS.night).
+export const SKY_HINTS = {
+  on: 'Changes with this device\'s clock.',
+  matchDevice: 'Turns dark after 8 PM on the next page you open.',
+  background: 'Only on the Clouds background.',
+  solid: 'Off while glass is solid.',
+  transparency: 'Off while this device reduces transparency.',
+  look: 'Paper & Clay is always plain paper.',
+};
 
 // The Glass segment shown as chosen: 'auto' is Frosted, or Solid when the device asks for less transparency;
 // a look is always Solid.

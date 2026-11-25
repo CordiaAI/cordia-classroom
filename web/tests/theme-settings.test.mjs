@@ -9,6 +9,7 @@ import {
 } from '../lib/themeSettings.mjs';
 import { ACCENT_VARIABLES } from '../lib/accentMath.mjs';
 import { LOOK_KEY, bootScript } from '../lib/themeBoot.mjs';
+import { skyPeriod } from '../lib/skyTime.mjs';
 
 // The one shared cache the app kept before each account had its own (lib/theme.js carries it over once).
 const OLD_KEY = LOOK_KEY;
@@ -167,7 +168,9 @@ test('the font a pair needs is cached for preloading, and the default pair needs
 // ---------- First paint ----------
 
 const PUBLIC_LIST = ['/privacy'];
-function boot({ path = '/library', storage = {}, deviceDark = false, hasMatchMedia = true, raw = false } = {}) {
+// The clock is noon unless a test says otherwise (`hour`), so the time-of-day sky never turns a Match device page
+// dark under these tests at night; `lessTransparency` is the device's reduced-transparency answer.
+function boot({ path = '/library', storage = {}, deviceDark = false, hasMatchMedia = true, raw = false, hour = 12, lessTransparency = false } = {}) {
   const root = fakeRoot();
   const links = [];
   // `storage[LOOK_KEY]` is the signed-in account's cache: it is kept under that account's own key (cordiaLook:<id>),
@@ -183,9 +186,14 @@ function boot({ path = '/library', storage = {}, deviceDark = false, hasMatchMed
     document: { documentElement: root, head: { appendChild: link => links.push(link) }, createElement: () => ({}) },
     location: { pathname: path },
     localStorage: { getItem: key => (key in store ? store[key] : null), get length() { return Object.keys(store).length; }, key: index => Object.keys(store)[index] ?? null },
-    window: hasMatchMedia ? { matchMedia: () => ({ matches: deviceDark }) } : {},
-    matchMedia: () => ({ matches: deviceDark }),
+    window: hasMatchMedia ? { matchMedia: query => media(query) } : {},
+    matchMedia: query => media(query),
+    Date: class extends Date { constructor(...args) { if (args.length) super(...args); else { super(2026, 10, 18); this.setHours(Math.floor(hour), Math.round((hour % 1) * 60)); } } },
   };
+  function media(query) {
+    if (query.includes('prefers-reduced-transparency')) return { matches: lessTransparency };
+    return { matches: query.includes('prefers-color-scheme: dark') ? deviceDark : false };
+  }
   vm.runInNewContext(bootScript(PUBLIC_LIST), sandbox);
   return { root, links };
 }
@@ -289,7 +297,9 @@ test('first paint: a damaged cache is ignored, never thrown, and never sets odd 
   assert.equal(boot({ storage: { [LOOK_KEY]: '{not json' } }).root.getAttribute('data-theme'), 'light');
   const hostile = JSON.stringify({ a: { 'onclick': 'x', 'data-accent': 'plum', 'data-bg': 5 }, v: { color: 'red', '--ca-l-fill': '1, 2, 3' }, f: ['https://evil.example/x.woff2', '/fonts/inter-latin.woff2'], ap: 'dark' });
   const { root, links } = boot({ storage: { [LOOK_KEY]: hostile } });
-  assert.deepEqual([...root.attributes.keys()].sort(), ['data-accent', 'data-side', 'data-theme']);
+  // data-sky is the default's own (a cache with no settings in it is the default look, whose sky follows the time).
+  assert.deepEqual([...root.attributes.keys()].sort(), ['data-accent', 'data-side', 'data-sky', 'data-theme']);
+  assert.equal(root.getAttribute('data-sky'), 'day');
   assert.deepEqual([...root.styleMap.keys()], ['--ca-l-fill']);
   assert.deepEqual(links.map(l => l.href), ['/fonts/inter-latin.woff2']);
 });
@@ -523,4 +533,41 @@ test('first paint: Paper & Clay is on <html> before anything draws, with its fon
   for (const path of ['/', '/login', '/pricing', '/guides/anything']) assert.deepEqual(lookAttributes(boot({ path, storage: { [LOOK_KEY]: cached(settings) } }).root), [], path);
   assert.equal(boot({ path: '/privacy', storage: { [LOOK_KEY]: cached(settings), authToken: 'x' } }).root.getAttribute('data-look'), 'paper-clay', 'signed in, a policy page follows the account');
   assert.deepEqual(lookAttributes(boot({ path: '/pricing', storage: { [LOOK_KEY]: cached(settings), authToken: 'x' } }).root), [], 'Pricing stays the Cordia default, signed in too');
+});
+
+// ---------- First paint: the time-of-day sky (VISUAL-POLISH V3) ----------
+
+test('first paint: the sky for the device\'s hour is on <html> before anything draws, the same hours as skyPeriod', () => {
+  for (let hour = 0; hour < 24; hour += 0.5) {
+    assert.equal(boot({ hour }).root.getAttribute('data-sky'), skyPeriod(hour), `nothing cached, ${hour}h`);
+    assert.equal(boot({ hour, storage: { [LOOK_KEY]: cached({ accent: 'ocean' }) } }).root.getAttribute('data-sky'), skyPeriod(hour), `ocean on clouds, ${hour}h`);
+  }
+});
+
+test('first paint: no sky where it turns itself off, and none on public pages', () => {
+  const at = (settings, extra = {}) => boot({ hour: 22, storage: { [LOOK_KEY]: cached(settings) }, ...extra }).root.getAttribute('data-sky');
+  assert.equal(at({}), 'night');
+  assert.equal(at({ skyTime: false }), null, 'turned off');
+  assert.equal(at({ glass: 'solid' }), null, 'Solid glass');
+  assert.equal(at({ bg: 'dusk' }), null, 'another background');
+  assert.equal(at(applyPreset(DEFAULT_SETTINGS, 'paper-clay')), null, 'Paper & Clay');
+  assert.equal(at({}, { lessTransparency: true }), null, 'reduced transparency');
+  assert.equal(at({ glass: 'frosted' }, { lessTransparency: true }), null, 'reduced transparency, even with Frosted picked');
+  assert.equal(boot({ hour: 22, path: '/privacy' }).root.getAttribute('data-sky'), null, 'a public page');
+  assert.equal(boot({ hour: 22, path: '/' }).root.getAttribute('data-sky'), null);
+  // A cache from before the option existed has no `k`: its settings decide.
+  const old = settings => JSON.stringify({ ...bootCache(settings), k: undefined });
+  assert.equal(boot({ hour: 22, storage: { [LOOK_KEY]: old({}) } }).root.getAttribute('data-sky'), 'night');
+  assert.equal(boot({ hour: 22, storage: { [LOOK_KEY]: old({ bg: 'meadow' }) } }).root.getAttribute('data-sky'), null);
+});
+
+test('first paint: at night a Match device page is dark from the first frame; Light and Dark keep their choice', () => {
+  const theme = (settings, extra = {}) => boot({ hour: 21, storage: { [LOOK_KEY]: cached(settings) }, ...extra }).root.getAttribute('data-theme');
+  assert.equal(theme({ appearance: 'system' }), 'dark', 'Match device on a light device, at night');
+  assert.equal(theme({ appearance: 'system' }, { hour: 9 }), 'light', 'and light again in the morning');
+  assert.equal(theme({ appearance: 'light' }), 'light', 'Light is never forced dark');
+  assert.equal(theme({ appearance: 'dark' }, { hour: 12 }), 'dark');
+  assert.equal(theme({ appearance: 'system', glass: 'solid' }), 'light', 'with the sky off, Match device follows the device alone');
+  assert.equal(theme({ appearance: 'system' }, { lessTransparency: true }), 'light');
+  assert.equal(boot({ hour: 21 }).root.getAttribute('data-theme'), 'light', 'an existing account with nothing cached stays Light');
 });

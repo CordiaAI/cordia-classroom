@@ -7,6 +7,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import * as settingsModule from '../lib/themeSettings.mjs';
 import * as bootModule from '../lib/themeBoot.mjs';
+import * as skyModule from '../lib/skyTime.mjs';
 
 const { DEFAULT_SETTINGS } = settingsModule;
 
@@ -71,6 +72,7 @@ async function browser({ users = {}, store = new Map() } = {}) {
     './progress': progress,
     './themeSettings.mjs': settingsModule,
     './themeBoot.mjs': bootModule,
+    './skyTime.mjs': skyModule,
   });
   theme.applyTheme('/library'); // the page the student is on (the default path is a public one)
   return {
