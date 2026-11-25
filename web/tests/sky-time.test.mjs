@@ -413,7 +413,7 @@ test('the crossfade is 3 seconds of opacity only, and instant under reduced moti
   assert.equal(token(LIGHT, '--dur-sky'), '3000ms');
   const layers = ':root[data-sky-fade] .c-sky::before, :root[data-sky-fade] .c-sky::after, :root[data-sky-fade] .c-sky-night';
   assert.match(css, new RegExp(`${layers.replace(/[[\]().*]/g, m => `\\${m}`)} \\{ transition: opacity var\\(--dur-sky\\) var\\(--ease-sky\\); will-change: opacity; \\}`));
-  assert.match(css, /:root\[data-sky='morning'\] \.c-sky::before, :root\[data-sky='evening'\] \.c-sky::after, :root\[data-sky='night'\] \.c-sky-night \{ opacity: 1; \}/);
+  assert.match(css, /:root\[data-sky='morning'\] \.c-sky::before, :root\[data-sky='evening'\] \.c-sky::after, :root\[data-sky='night'\] \.c-sky-night \{ opacity: 1; will-change: opacity; \}/);
   const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce) {\n  :root[data-sky-fade]'));
   assert.match(reduced, /^@media \(prefers-reduced-motion: reduce\) \{\n  :root\[data-sky-fade\] \.c-sky::before, :root\[data-sky-fade\] \.c-sky::after, :root\[data-sky-fade\] \.c-sky-night \{ transition: none; \}\n\}/);
   assert.doesNotMatch(skyCss, /transition:(?!\s*(none|opacity )[^,;]*;)/, 'nothing but opacity transitions');

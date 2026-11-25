@@ -937,7 +937,9 @@ body::after { inset: 0; background: var(--backdrop-wash); }
    Morning is .c-sky::before, evening .c-sky::after, and night (the veil, its soft light and the static stars) is
    .c-sky-night, on top. Each is fully drawn and only its opacity changes, so a period change while the page is open
    (lib/theme.js holds <html data-sky-fade>) is an opacity crossfade the compositor runs: nothing is repainted per
-   frame. First paint and a pick in Make it yours change at once; so does everything under reduced motion. */
+   frame. The shown period's layer keeps its own compositor layer (will-change), and so does every layer during a
+   fade; day has none. First paint and a pick in Make it yours change at once; so does everything under reduced
+   motion. */
 .c-sky { display: none; }
 :root[data-sky] .c-sky { display: block; position: fixed; inset: 0; z-index: -1; pointer-events: none; user-select: none; }
 .c-sky::before, .c-sky::after, .c-sky-night { content: ''; position: absolute; inset: 0; opacity: 0; }
@@ -963,7 +965,7 @@ body::after { inset: 0; background: var(--backdrop-wash); }
     radial-gradient(70% 55% at 16% 0%, var(--sky-night-glow), transparent 70%),
     linear-gradient(180deg, var(--sky-night-top), var(--sky-night-bottom));
 }
-:root[data-sky='morning'] .c-sky::before, :root[data-sky='evening'] .c-sky::after, :root[data-sky='night'] .c-sky-night { opacity: 1; }
+:root[data-sky='morning'] .c-sky::before, :root[data-sky='evening'] .c-sky::after, :root[data-sky='night'] .c-sky-night { opacity: 1; will-change: opacity; }
 :root[data-sky-fade] .c-sky::before, :root[data-sky-fade] .c-sky::after, :root[data-sky-fade] .c-sky-night { transition: opacity var(--dur-sky) var(--ease-sky); will-change: opacity; }
 @media (prefers-reduced-motion: reduce) {
   :root[data-sky-fade] .c-sky::before, :root[data-sky-fade] .c-sky::after, :root[data-sky-fade] .c-sky-night { transition: none; }
