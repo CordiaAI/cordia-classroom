@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { getToken } from './api';
-import { createUndoQueue, pathsOf, sendDelete } from './guideActions';
+import { createUndoQueue, pathsOf, sendDeleteFrom } from './guideActions';
 
 const API = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 export const UNDO_MS = 6000;
@@ -12,20 +12,21 @@ const NONE = { pending: null, hidden: new Set() };
 // then onDeleted(item) says it is gone for good, or onFailed(item, message) says why it is back.
 // pending: { id, title, path?, also? } (path defaults to the guide; also: more paths deleted with it)
 // hidden: ids to leave out of the list (the one waiting and the ones being deleted)
-export function useUndoDelete({ onUndo, onDeleted, onFailed } = {}) {
+// source: the page that owns the queue; it is named in the announcement so that page does not read its own lists again.
+export function useUndoDelete({ onUndo, onDeleted, onFailed, source } = {}) {
   const callbacks = useRef({});
   callbacks.current = { onUndo, onDeleted, onFailed };
   const queue = useMemo(() => {
     const subscribers = new Set();
     const made = createUndoQueue({
-      send: sendDelete,
+      send: sendDeleteFrom(source),
       delay: UNDO_MS,
       onChange: () => subscribers.forEach(listener => listener()),
       onDeleted: item => callbacks.current.onDeleted?.(item),
       onFailed: (item, message) => callbacks.current.onFailed?.(item, message),
     });
     return { ...made, subscribe: listener => { subscribers.add(listener); return () => subscribers.delete(listener); } };
-  }, []);
+  }, [source]);
   const state = useSyncExternalStore(queue.subscribe, queue.snapshot, () => NONE);
 
   useEffect(() => {

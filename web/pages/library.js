@@ -13,7 +13,7 @@ import useSessionTracker from '../lib/useSessionTracker';
 import { dueCount } from '../lib/studyQueue';
 import { listLectures } from '../lib/lectures';
 import { useUndoDelete } from '../lib/undoDelete';
-import { GUIDES_ORGANIZED, createLocalChanges, moveGuide, removeClass } from '../lib/guideActions';
+import { GUIDES_ORGANIZED, createLocalChanges, movedMessage, moveAndReport, moveGuide, removeClass, takeNotice, toastMs } from '../lib/guideActions';
 import ProgressRing from '../components/ProgressRing';
 import Menu from '../components/Menu';
 import ConfirmDialog from '../components/ConfirmDialog';
@@ -101,6 +101,8 @@ export default function LibraryPage() {
   const [miscOpen, setMiscOpen] = useState(false); // card view: the Miscellaneous card's items showing
   const gate = useLoadGate(!loading || Boolean(loadError));
   const [toast, setToast] = useState('');
+  // A message about something that did not go through. Unlike `toast`, it shows over the Undo toast.
+  const [problem, setProblem] = useState('');
   const [confirm, setConfirm] = useState(null);
   // Rows (classes that open in place) or cards (a card per class with its cover; items as tiles).
   const [view, chooseView] = useListView();
@@ -110,7 +112,8 @@ export default function LibraryPage() {
   // Moves and deletes made while the list was loading must survive that load's answer (see loadData).
   const local = useRef(createLocalChanges());
   const loadSeq = useRef(0);
-  const { pending, hidden, remove, undo } = useUndoDelete({
+  const { pending, hidden, remove: queueRemove, undo } = useUndoDelete({
+    source: 'library',
     // The server deleted it: it leaves this page's lists too (they are not read again), with its note if it took one.
     onDeleted: item => {
       const ids = [item.id, ...(item.also || []).map(path => path.split('/').pop())];
@@ -119,8 +122,10 @@ export default function LibraryPage() {
       setNotes(current => current.filter(note => !ids.includes(note.id)));
     },
     // It did not go through (or only part did): say so, and read the lists again so they show what is really there.
-    onFailed: (_item, message) => { setToast(message); loadData({ quiet: true }); },
+    onFailed: (_item, message) => { setProblem(message); loadData({ quiet: true }); },
   });
+  // A delete shows Undo at once: a message about an earlier move would otherwise hide it.
+  const remove = item => { setToast(''); return queueRemove(item); };
   // Practice from a file that isn't in Library: read it here, then open the workspace on it.
   const practiceFileRef = useRef(null);
   const [readingFile, setReadingFile] = useState(false);
@@ -131,7 +136,7 @@ export default function LibraryPage() {
       handOffUpload(await readPracticeFile(file));
       router.push('/practice');
     } catch (error) {
-      setToast(error.message || 'This file could not be read.');
+      setProblem(error.message || 'This file could not be read.');
     } finally {
       setReadingFile(false);
       if (practiceFileRef.current) practiceFileRef.current.value = '';
@@ -179,9 +184,18 @@ export default function LibraryPage() {
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = setTimeout(() => setToast(''), 2500);
+    const timer = setTimeout(() => setToast(''), toastMs(toast));
     return () => clearTimeout(timer);
   }, [toast]);
+
+  useEffect(() => {
+    if (!problem) return undefined;
+    const timer = setTimeout(() => setProblem(''), toastMs(problem));
+    return () => clearTimeout(timer);
+  }, [problem]);
+
+  // A class deleted from its own page lands here: say what was left undone.
+  useEffect(() => { const carried = takeNotice(); if (carried) setProblem(carried); }, []);
 
   // A merge or restore (from the banner, the bell or a set page) changes the list.
   useEffect(() => {
@@ -191,9 +205,9 @@ export default function LibraryPage() {
   }, []);
 
   // A guide was moved or deleted from the Tutor or another page: read the lists again behind this one.
-  // (Moves and deletes made here are already in the lists; the answer keeps them, see createLocalChanges.)
+  // Moves and deletes made here (source 'library') are already in the lists, so they cost no reload.
   useEffect(() => {
-    const reload = () => loadData({ quiet: true });
+    const reload = event => { if (event.detail?.source !== 'library') loadData({ quiet: true }); };
     window.addEventListener(GUIDES_ORGANIZED, reload);
     return () => window.removeEventListener(GUIDES_ORGANIZED, reload);
   }, []);
@@ -265,9 +279,9 @@ export default function LibraryPage() {
     setConfirm({
       title: `Delete ${folder.name}?`,
       onConfirm: async () => {
-        const result = await removeClass(folder);
+        const result = await removeClass(folder, { source: 'library' });
         setConfirm(null);
-        if (!result.ok) setToast(result.message);
+        if (!result.ok) setProblem(result.message);
         loadData({ quiet: true });
       },
     });
@@ -283,22 +297,25 @@ export default function LibraryPage() {
 
   async function moveItem(item, folderId) {
     if ((item.folderId || null) === folderId) return;
-    const label = folderId ? `Moved to ${classLabel(folders.find(folder => folder.id === folderId)?.name).title || 'class'}` : 'Moved to Miscellaneous';
+    const className = folderId ? classLabel(folders.find(folder => folder.id === folderId)?.name).title || 'class' : 'Miscellaneous';
+    let label = '';
     if (item.kind === 'guide') {
-      const result = await moveGuide(item.id, folderId);
+      const result = await moveAndReport((id, target) => moveGuide(id, target, { source: 'library' }), { id: item.id, folderId, className });
       if (!result.ok) {
-        setToast(result.message);
+        setProblem(result.message);
         // Gone, or into a class that is gone: the lists on this page are out of date.
-        if (result.gone || result.folderMissing) loadData({ quiet: true });
+        if (result.reload) loadData({ quiet: true });
         return;
       }
+      label = result.message;
       local.current.moved(item.id, folderId);
       setGuides(current => current.map(guide => (guide.id === item.id ? { ...guide, folder_id: folderId } : guide)));
     } else if (item.kind === 'note') {
       const data = await apiFetch('/smart_notes/' + item.id, { method: 'PUT', body: JSON.stringify({ folder_id: folderId || '' }) });
-      if (!data?.updated) { setToast(apiErrorMessage(data?.detail, 'Note not moved.')); return; }
+      if (!data?.updated) { setProblem(apiErrorMessage(data?.detail, 'Note not moved.')); return; }
       local.current.moved(item.id, folderId);
       setNotes(current => current.map(note => (note.id === item.id ? { ...note, folder_id: folderId } : note)));
+      label = movedMessage(className);
     } else return;
     setToast(label);
   }
@@ -575,13 +592,14 @@ export default function LibraryPage() {
       </div>
       )}
 
-      {/* A message (a move or delete that did not go through) shows over the Undo toast; Undo returns after it. */}
-      {toast ? <div className="c-toast" role="status"><span>{toast}</span></div> : pending && (
+      {/* A message about something that did not go through shows over the Undo toast; Undo returns after it. A plain
+          confirmation (Moved to...) never hides Undo: the list already shows the change. */}
+      {problem ? <div className="c-toast" role="status"><span>{problem}</span></div> : pending ? (
         <div className="c-toast" role="status">
           <span>Deleted</span>
           <button type="button" className="c-btn c-btn--quiet" onClick={undo}>Undo</button>
         </div>
-      )}
+      ) : toast && <div className="c-toast" role="status"><span>{toast}</span></div>}
       {coverFor && (
         <ClassCoverSheet folder={coverFor} titles={classTitles(coverFor.id)} onClose={() => setCoverFor(null)}
           onSaved={folder => { setFolders(current => current.map(item => (item.id === folder.id ? { ...item, ...folder } : item))); setCoverFor(null); setToast('Cover saved'); }} />

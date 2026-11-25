@@ -121,6 +121,31 @@ class GuideMoveDeleteTests(unittest.TestCase):
         self.assertEqual(self.db.rows("shared_sets")[0]["visibility"], "private")
         self.assertEqual(self.guide()["visibility"], "private")
 
+    def test_the_move_answer_says_which_class_it_stopped_being_shared_with(self):
+        self.guide()["visibility"] = "classroom"
+        self.db.rows("classes").append({"id": MGT_CLASS, "course_code_normalized": "MGT 300", "display_name": "Operations"})
+        self.db.rows("shared_sets").append({"id": "s1", "guide_id": GUIDE, "owner_id": ANA, "class_id": MGT_CLASS, "visibility": "class"})
+        response = self.call("patch", "ana", f"/guides/{GUIDE}/move", json={"folder_id": FILM})
+        self.assertEqual(response.json(), {"updated": True, "folder_id": FILM, "unshared_from": "MGT 300"})
+        # Falls back to the student's own name for the class when the class row is not readable.
+        self.db.tables["classes"] = []
+        self.db.rows("shared_sets")[0]["visibility"] = "class"
+        self.guide()["folder_id"] = MGT
+        again = self.call("patch", "ana", f"/guides/{GUIDE}/move", json={"folder_id": FILM})
+        self.assertEqual(again.json()["unshared_from"], "MGT 300")
+
+    def test_a_move_that_stops_no_share_has_no_unshared_from(self):
+        response = self.call("patch", "ana", f"/guides/{GUIDE}/move", json={"folder_id": FILM})
+        self.assertEqual(response.json(), {"updated": True, "folder_id": FILM})
+
+    def test_a_sharing_failure_after_the_move_does_not_make_the_move_an_error(self):
+        from routers import guides
+        with patch.object(guides, "_stop_sharing_with_old_class", side_effect=RuntimeError("sharing table unavailable")):
+            response = self.call("patch", "ana", f"/guides/{GUIDE}/move", json={"folder_id": FILM})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {"updated": True, "folder_id": FILM})
+        self.assertEqual(self.guide()["folder_id"], FILM)
+
     def test_moving_a_shared_guide_within_the_same_class_keeps_it_shared(self):
         self.guide()["visibility"] = "classroom"
         self.db.rows("shared_sets").append({"id": "s1", "guide_id": GUIDE, "owner_id": ANA, "class_id": MGT_CLASS, "visibility": "class"})

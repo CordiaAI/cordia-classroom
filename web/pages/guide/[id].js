@@ -34,7 +34,7 @@ import { readUserValue, writeUserValue } from '../../lib/userStore';
 import { exportToDocs, exportToNotion } from '../../lib/studyPlans';
 import SegmentedControl from '../../components/SegmentedControl';
 import MergeSheet from '../../components/MergeSheet';
-import { deleteGuide as deleteGuideRequest, moveGuide } from '../../lib/guideActions';
+import { carryNotice, deleteGuide as deleteGuideRequest, moveGuide, toastMs } from '../../lib/guideActions';
 import { GUIDES_CHANGED, mergedInto, restoreMerged, useDuplicates } from '../../lib/duplicates';
 
 const NURSING_TERMS = ['nursing', 'nurse', 'nclex', 'patient', 'vital signs', 'medication administration', 'care plan', 'nursing diagnosis', 'iv therapy', 'delegation', 'scope of practice', 'sbar', 'discharge planning', 'wound care', 'fall prevention', 'infection control', 'postoperative', 'preoperative', 'lab values', 'contraindications'];
@@ -234,7 +234,7 @@ export default function GuidePage() {
 
   useEffect(() => {
     if (!toast) return undefined;
-    const timer = setTimeout(() => { setToast(''); setUndoNotes(null); setToastAction(null); }, undoNotes === null && !toastAction ? 2500 : 8000);
+    const timer = setTimeout(() => { setToast(''); setUndoNotes(null); setToastAction(null); }, undoNotes === null && !toastAction ? toastMs(toast) : 8000);
     return () => clearTimeout(timer);
   }, [toast]);
 
@@ -395,7 +395,9 @@ export default function GuidePage() {
     if (result.ok) {
       setGuide(current => ({ ...current, folder_id: folderId }));
       const name = classLabel(classes.find(item => item.id === folderId)?.name).title;
-      setToast(folderId ? `Added to ${name || 'class'}` : 'Removed from its class');
+      // A shared guide filed in another class stops being shared with the old one (the server says which).
+      const unshared = result.unsharedFrom ? ` No longer shared with ${result.unsharedFrom}.` : '';
+      setToast((folderId ? `Added to ${name || 'class'}` : 'Removed from its class') + (unshared ? '.' : '') + unshared);
       loadSharing();
     } else setToast(result.message);
   }
@@ -406,6 +408,9 @@ export default function GuidePage() {
     // would show in Library again and come back as a new guide when opened.
     const noteId = String(guide?.source_type || '').startsWith('note:') ? guide.source_type.slice(5) : '';
     const result = await deleteGuideRequest(id, noteId ? ['/smart_notes/' + noteId] : []);
+    // Partly done (the guide is gone, its note is not): this page is for something that no longer exists,
+    // so Library shows what is left, with the reason.
+    if (result.partial) { carryNotice(result.message); router.push('/library'); return; }
     if (!result.ok) { setToast(result.message); return; }
     router.push('/library');
   }
