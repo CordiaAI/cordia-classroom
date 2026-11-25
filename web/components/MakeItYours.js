@@ -448,7 +448,7 @@ function MakeItYoursSheet({ phase, onClose, onReset, toastRef }) {
         .miy-sky .c-toggle.is-disabled { opacity: 1; cursor: default; }
         .miy-sky .c-toggle.is-disabled .c-toggle-track { opacity: .62; }
         .miy-sky .c-toggle-desc { text-wrap: pretty; }
-        .miy-sky-line { display: block; }
+        .miy-sky-line { display: block; text-wrap: balance; }
 
         .miy-row > .miy-seg { justify-self: start; max-width: 100%; }
         .miy-seg.is-locked { opacity: .6; }
